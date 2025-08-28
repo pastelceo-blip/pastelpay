@@ -1581,9 +1581,9 @@
         function drawPieChart(canvasId, data) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
-            const centerX = canvas.width / 2;
+            const centerX = canvas.width / 2 - 60; // 범례 공간 확보를 위해 왼쪽으로 이동
             const centerY = canvas.height / 2;
-            const radius = Math.min(centerX, centerY) - 100;
+            const radius = Math.min(centerX - 50, centerY - 50); // 반지름 조정
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1594,9 +1594,9 @@
                 ctx.font = '16px Malgun Gothic';
                 ctx.fillStyle = '#7f8c8d';
                 ctx.textAlign = 'center';
-                ctx.fillText('지출 데이터가 없습니다', centerX, centerY - 10);
+                ctx.fillText('지출 데이터가 없습니다', canvas.width / 2, centerY - 10);
                 ctx.font = '14px Malgun Gothic';
-                ctx.fillText('새 지출을 등록해보세요', centerX, centerY + 15);
+                ctx.fillText('새 지출을 등록해보세요', canvas.width / 2, centerY + 15);
                 return;
             }
 
@@ -1612,17 +1612,18 @@
                 ctx.fillStyle = colors[index % colors.length];
                 ctx.fill();
                 ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 2;
                 ctx.stroke();
 
-                if (sliceAngle > 0.15) {
+                // 퍼센트 라벨 (큰 조각만)
+                if (sliceAngle > 0.2) {
                     const labelAngle = currentAngle + sliceAngle / 2;
                     const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
                     const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
                     const percentage = ((data[category] / total) * 100).toFixed(1);
                     
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 12px Malgun Gothic';
+                    ctx.fillStyle = '#333';
+                    ctx.font = 'bold 11px Malgun Gothic';
                     ctx.textAlign = 'center';
                     ctx.fillText(`${percentage}%`, labelX, labelY);
                 }
@@ -1630,29 +1631,43 @@
                 currentAngle += sliceAngle;
             });
 
-            drawLegend(ctx, canvas, categories, colors, data, total);
+            drawLegend(ctx, canvas, categories, colors, data, total, centerX);
         }
 
         // 범례 그리기 (개선된 버전)
-        function drawLegend(ctx, canvas, categories, colors, data, total) {
-            const legendStartX = canvas.width - 180;
-            const legendWidth = 160;
-            let legendY = 30;
+        function drawLegend(ctx, canvas, categories, colors, data, total, chartCenterX) {
+            const legendStartX = Math.max(chartCenterX + 120, canvas.width - 200); // 차트 오른쪽에 배치
+            const legendWidth = 180;
+            let legendY = 40;
+            
+            // 범례가 캔버스를 벗어나지 않도록 조정
+            if (legendStartX + legendWidth > canvas.width) {
+                return; // 공간이 부족하면 범례 생략
+            }
             
             // 범례 배경 그리기
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-            ctx.fillRect(legendStartX - 10, legendY - 15, legendWidth, categories.length * 40 + 20);
-            ctx.strokeStyle = '#e9ecef';
+            const legendHeight = Math.min(categories.length * 35 + 20, canvas.height - 80);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+            ctx.fillRect(legendStartX - 10, legendY - 15, legendWidth, legendHeight);
+            ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
-            ctx.strokeRect(legendStartX - 10, legendY - 15, legendWidth, categories.length * 40 + 20);
+            ctx.strokeRect(legendStartX - 10, legendY - 15, legendWidth, legendHeight);
             
-            ctx.font = '11px Malgun Gothic';
+            // 범례 제목
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 12px Malgun Gothic';
             ctx.textAlign = 'left';
+            ctx.fillText('카테고리별 지출', legendStartX, legendY + 5);
+            legendY += 25;
             
-            categories.forEach((category, index) => {
+            ctx.font = '10px Malgun Gothic';
+            
+            categories.slice(0, 12).forEach((category, index) => { // 최대 12개만 표시
+                if (legendY > canvas.height - 60) return; // 캔버스 하단 여백 확보
+                
                 // 색상 박스
                 ctx.fillStyle = colors[index % colors.length];
-                ctx.fillRect(legendStartX, legendY, 12, 12);
+                ctx.fillRect(legendStartX, legendY, 10, 10);
                 
                 // 텍스트
                 ctx.fillStyle = '#2c3e50';
@@ -1660,17 +1675,25 @@
                 const percentage = ((amount / total) * 100).toFixed(1);
                 
                 // 카테고리명 (길면 잘라내기)
-                const categoryText = category.length > 8 ? category.substring(0, 8) + '...' : category;
-                ctx.fillText(categoryText, legendStartX + 18, legendY + 10);
+                const categoryText = category.length > 10 ? category.substring(0, 10) + '...' : category;
+                ctx.fillText(categoryText, legendStartX + 15, legendY + 8);
                 
-                // 금액과 퍼센트
+                // 금액과 퍼센트 (한 줄로)
+                const amountText = `₩${(amount/1000).toFixed(0)}K (${percentage}%)`;
+                ctx.fillStyle = '#666';
+                ctx.font = '9px Malgun Gothic';
+                ctx.fillText(amountText, legendStartX + 15, legendY + 18);
                 ctx.font = '10px Malgun Gothic';
-                ctx.fillText(`₩${amount.toLocaleString()}`, legendStartX + 18, legendY + 22);
-                ctx.fillText(`(${percentage}%)`, legendStartX + 18, legendY + 32);
                 
-                ctx.font = '11px Malgun Gothic';
-                legendY += 40;
+                legendY += 30;
             });
+            
+            // 더 많은 항목이 있는 경우 표시
+            if (categories.length > 12) {
+                ctx.fillStyle = '#888';
+                ctx.font = '9px Malgun Gothic';
+                ctx.fillText(`...외 ${categories.length - 12}개`, legendStartX + 15, legendY + 5);
+            }
         }
 
         // 비교 막대 차트 그리기
@@ -1699,7 +1722,7 @@
 
             const chartHeight = canvas.height - 80;
             const chartTop = 40;
-            const groupSpacing = Math.min(80, (canvas.width - 100) / allCategories.length);
+            const groupSpacing = Math.min(80, (canvas.width - 150) / allCategories.length);
 
             allCategories.forEach((category, index) => {
                 const x = 50 + index * groupSpacing;
@@ -1707,11 +1730,11 @@
                 const thisAmount = thisMonthData[category] || 0;
 
                 const lastBarHeight = (lastAmount / maxAmount) * chartHeight;
-                ctx.fillStyle = '#95a5a6';
+                ctx.fillStyle = '#D7CCC8'; // 파스텔 브라운 (지난 달)
                 ctx.fillRect(x, chartTop + chartHeight - lastBarHeight, barWidth, lastBarHeight);
 
                 const thisBarHeight = (thisAmount / maxAmount) * chartHeight;
-                ctx.fillStyle = '#3498db';
+                ctx.fillStyle = '#AED6F1'; // 파스텔 블루 (이번 달)
                 ctx.fillRect(x + barWidth + 5, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
 
                 ctx.fillStyle = '#2c3e50';
@@ -1721,24 +1744,32 @@
                 ctx.fillText(categoryText, x + barWidth, canvas.height - 10);
             });
 
-            // 범례
-            ctx.fillStyle = '#95a5a6';
-            ctx.fillRect(canvas.width - 150, 10, 20, 15);
-            ctx.fillStyle = '#2c3e50';
-            ctx.font = '14px Malgun Gothic';
-            ctx.textAlign = 'left';
-            ctx.fillText('지난 달', canvas.width - 125, 22);
+            // 범례 (오른쪽 상단)
+            const legendX = canvas.width - 120;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.fillRect(legendX - 10, 5, 110, 50);
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(legendX - 10, 5, 110, 50);
 
-            ctx.fillStyle = '#3498db';
-            ctx.fillRect(canvas.width - 150, 30, 20, 15);
-            ctx.fillText('이번 달', canvas.width - 125, 42);
+            ctx.fillStyle = '#D7CCC8';
+            ctx.fillRect(legendX, 15, 15, 12);
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '12px Malgun Gothic';
+            ctx.textAlign = 'left';
+            ctx.fillText('지난 달', legendX + 20, 25);
+
+            ctx.fillStyle = '#AED6F1';
+            ctx.fillRect(legendX, 35, 15, 12);
+            ctx.fillText('이번 달', legendX + 20, 45);
         }
 
-        // 차트 색상 팔레트
+        // 차트 색상 팔레트 (파스텔톤)
         function getChartColors() {
             return [
-                '#3498db', '#e74c3c', '#f39c12', '#2ecc71', '#9b59b6',
-                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#f1c40f'
+                '#AED6F1', '#F8C8DC', '#FFE5B4', '#C8E6C9', '#E1BEE7',
+                '#B2DFDB', '#D7CCC8', '#FFCCBC', '#F8BBD9', '#DCEDC1',
+                '#FFF9C4', '#E8F5E8', '#FCE4EC', '#E3F2FD', '#F3E5F5'
             ];
         }
 
