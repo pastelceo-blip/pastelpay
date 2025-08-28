@@ -341,7 +341,7 @@
                 <h3>로그인이 필요합니다</h3>
                 <p>Google 계정으로 로그인하여 안전하게 지출 데이터를 관리하세요</p>
                 <br>
-                <button onclick="window.signInWithGoogle()">Google 로그인</button>
+                <button id="googleSignInBtn">Google 로그인</button>
             </div>
             <div id="signedIn" style="display: none;">
                 <div class="user-info">
@@ -349,7 +349,7 @@
                         <span id="userName">사용자</span>님 안녕하세요
                         <span class="sync-status" id="syncStatus">연결 확인 중...</span>
                     </div>
-                    <button onclick="window.signOut()">로그아웃</button>
+                    <button id="signOutBtn">로그아웃</button>
                 </div>
             </div>
         </div>
@@ -894,11 +894,16 @@
                 
                 updateSyncStatus('offline');
                 
-                // 로그인 버튼 이벤트 연결
-                const googleSignInBtn = document.getElementById('googleSignInBtn');
-                if (googleSignInBtn) {
-                    googleSignInBtn.onclick = signInWithGoogle;
-                }
+                // 로그인 버튼 이벤트 연결 (DOM이 준비된 후)
+                setTimeout(() => {
+                    const googleSignInBtn = document.getElementById('googleSignInBtn');
+                    if (googleSignInBtn) {
+                        console.log('로그인 버튼 이벤트 연결');
+                        googleSignInBtn.addEventListener('click', signInWithGoogle);
+                    } else {
+                        console.error('로그인 버튼을 찾을 수 없습니다');
+                    }
+                }, 100);
                 
                 console.log('사용자 로그아웃');
             }
