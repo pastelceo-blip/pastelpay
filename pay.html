@@ -341,7 +341,7 @@
                 <h3>로그인이 필요합니다</h3>
                 <p>Google 계정으로 로그인하여 안전하게 지출 데이터를 관리하세요</p>
                 <br>
-                <button id="googleSignInBtn">Google 로그인</button>
+                <button onclick="window.signInWithGoogle()">Google 로그인</button>
             </div>
             <div id="signedIn" style="display: none;">
                 <div class="user-info">
@@ -349,7 +349,7 @@
                         <span id="userName">사용자</span>님 안녕하세요
                         <span class="sync-status" id="syncStatus">연결 확인 중...</span>
                     </div>
-                    <button id="signOutBtn">로그아웃</button>
+                    <button onclick="window.signOut()">로그아웃</button>
                 </div>
             </div>
         </div>
@@ -508,7 +508,7 @@
                     
                     <div style="text-align: center; margin-top: 20px;">
                         <button type="submit" class="btn btn-success">고정비 등록</button>
-                        <button type="button" id="generateMonthlyBtn" class="btn">이번 달 고정비 생성</button>
+                        <button type="button" onclick="window.generateMonthlyExpenses()">이번 달 고정비 생성</button>
                     </div>
                 </form>
             </div>
@@ -590,6 +590,13 @@
         let currentUser = null;
         let expenseUnsubscribe = null;
         let fixedExpenseUnsubscribe = null;
+
+        // 함수들을 전역으로 노출
+        window.signInWithGoogle = signInWithGoogle;
+        window.signOut = signOut;
+        window.deleteExpenseById = deleteExpenseById;
+        window.deleteFixedExpenseById = deleteFixedExpenseById;
+        window.generateMonthlyExpenses = generateMonthlyExpenses;
 
         // DOM 요소들을 전역으로 설정
         window.signInWithGoogle = signInWithGoogle;
@@ -886,6 +893,13 @@
                 if (fixedExpenseUnsubscribe) fixedExpenseUnsubscribe();
                 
                 updateSyncStatus('offline');
+                
+                // 로그인 버튼 이벤트 연결
+                const googleSignInBtn = document.getElementById('googleSignInBtn');
+                if (googleSignInBtn) {
+                    googleSignInBtn.onclick = signInWithGoogle;
+                }
+                
                 console.log('사용자 로그아웃');
             }
         });
@@ -967,17 +981,37 @@
         function initializePage() {
             // 오늘 날짜를 기본값으로 설정
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
-            document.getElementById('fixedStartDate').value = today;
+            const dateInput = document.getElementById('date');
+            const fixedStartDateInput = document.getElementById('fixedStartDate');
+            
+            if (dateInput) dateInput.value = today;
+            if (fixedStartDateInput) fixedStartDateInput.value = today;
             
             // 폼 제출 이벤트
-            document.getElementById('expenseForm').addEventListener('submit', handleFormSubmit);
-            document.getElementById('fixedExpenseForm').addEventListener('submit', handleFixedExpenseSubmit);
+            const expenseForm = document.getElementById('expenseForm');
+            const fixedExpenseForm = document.getElementById('fixedExpenseForm');
+            
+            if (expenseForm) {
+                expenseForm.removeEventListener('submit', handleFormSubmit);
+                expenseForm.addEventListener('submit', handleFormSubmit);
+            }
+            
+            if (fixedExpenseForm) {
+                fixedExpenseForm.removeEventListener('submit', handleFixedExpenseSubmit);
+                fixedExpenseForm.addEventListener('submit', handleFixedExpenseSubmit);
+            }
             
             // 버튼 이벤트 리스너
-            document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
-            document.getElementById('signOutBtn')?.addEventListener('click', signOut);
-            document.getElementById('generateMonthlyBtn')?.addEventListener('click', generateMonthlyExpenses);
+            const signOutBtn = document.getElementById('signOutBtn');
+            const generateMonthlyBtn = document.getElementById('generateMonthlyBtn');
+            
+            if (signOutBtn) {
+                signOutBtn.onclick = signOut;
+            }
+            
+            if (generateMonthlyBtn) {
+                generateMonthlyBtn.onclick = generateMonthlyExpenses;
+            }
         }
 
         // 지출 등록 폼 제출 처리
