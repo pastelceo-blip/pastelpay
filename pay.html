@@ -1,4 +1,3 @@
-@@ -1,1859 +1,1018 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1133,7 +1132,7 @@ ${selectedCustomers.map((customer) =>
                   {fileType === 'wedding' ? '웨딩 쿠폰코드별로 고객 데이터를 정리했습니다' : '쿠폰코드별로 고객 데이터를 정리했습니다'}
                 </p>
               </div>
-            </div>
+</div>
             <div id="signedIn" style="display: none;">
                 <div class="user-info">
                     <div>
@@ -1153,16 +1152,16 @@ ${selectedCustomers.map((customer) =>
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 ${fileType === 'wedding' ? 'bg-pink-500' : 'bg-blue-500'} rounded-full`}></div>
                       <span>{fileType === 'wedding' ? '식전, 인트로, 포스터 영상 통합' : '메인, 인트로, 엔딩영상 통합'}</span>
-                    </div>
+</div>
                     <button id="signOutBtn">로그아웃</button>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span>같은 고객 여러 영상 = 1건</span>
                     </div>
                   </div>
-                </div>
+</div>
               ))}
-            </div>
+</div>
         </div>
         
         <div class="main-content" id="mainContent">
@@ -1207,14 +1206,14 @@ ${selectedCustomers.map((customer) =>
               <div className="flex items-center">
                 <div className={`w-12 h-12 bg-gradient-to-r ${fileType === 'wedding' ? 'from-rose-100 to-pink-100' : 'from-purple-100 to-indigo-100'} rounded-xl flex items-center justify-center mr-4`}>
                   <Users className={`w-6 h-6 ${fileType === 'wedding' ? 'text-rose-600' : 'text-purple-600'}`} />
-                </div>
+</div>
                 <div class="summary-card">
                     <h4>등록된 항목</h4>
                     <div class="amount" id="totalItems">0건</div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">중복 확인 및 최종 선택</h2>
                   <p className="text-gray-600">중복 항목을 확인하고 최종 정산 대상을 선택하세요</p>
-                </div>
+</div>
                 <div class="summary-card">
                     <h4>월 고정비</h4>
                     <div class="amount" id="averageExpense">₩0</div>
@@ -1243,9 +1242,9 @@ ${selectedCustomers.map((customer) =>
                     <AlertCircle className="w-4 h-4" />
                     중복만 보기 ({duplicateItems.length})
                   </button>
-                </div>
+</div>
               )}
-            </div>
+</div>
 
             <!-- 카테고리별 차트 -->
             <div class="form-section">
@@ -1261,7 +1260,7 @@ ${selectedCustomers.map((customer) =>
                 <div className={`${fileType === 'wedding' ? 'text-pink-600' : 'text-blue-600'} text-sm font-medium`}>전체 고객</div>
                 <div className={`text-2xl font-bold ${fileType === 'wedding' ? 'text-pink-800' : 'text-blue-800'}`}>
                   {Object.keys(finalList).reduce((acc, couponCode) => acc + finalList[couponCode].customers.length, 0)}명
-                </div>
+</div>
                 
                 <!-- 전체 지출 차트 -->
                 <div id="thisMonthChart" class="chart-container">
@@ -1277,7 +1276,7 @@ ${selectedCustomers.map((customer) =>
                 <div className="text-green-600 text-sm font-medium">선택된 고객</div>
                 <div className="text-2xl font-bold text-green-800">
                   {Object.values(selectedItems).filter(Boolean).length}명
-                </div>
+</div>
                 
                 <!-- 고정비 제외 차트 -->
                 <div id="nonFixedChart" class="chart-container" style="display: none;">
@@ -1307,9 +1306,9 @@ ${selectedCustomers.map((customer) =>
                 <div className="text-purple-600 text-sm font-medium">예상 금액</div>
                 <div className="text-2xl font-bold text-purple-800">
                   {(Object.values(selectedItems).filter(Boolean).length * 5000).toLocaleString()}원
-                </div>
+</div>
               </div>
-            </div>
+</div>
 
             <!-- 새 지출 등록 폼 -->
             <div class="form-section">
@@ -1404,15 +1403,15 @@ ${selectedCustomers.map((customer) =>
                               전체해제
                             </button>
                           </div>
-                        </div>
+</div>
                         <div class="form-group">
                             <label for="notes">비고</label>
                             <input type="text" id="notes" name="notes" placeholder="추가 메모 (선택사항)">
                         <div className={`bg-gradient-to-r ${getSystemColor()} text-white px-6 py-3 rounded-xl font-bold text-lg`}>
                           {selectedCount}/{totalCount}건 / {(selectedCount * 5000).toLocaleString()}원
-                        </div>
+</div>
                       </div>
-                    </div>
+</div>
 
                     <div style="text-align: center; margin-top: 20px;">
                         <button type="submit" class="btn btn-success">지출 등록</button>
@@ -1480,7 +1479,7 @@ ${selectedCustomers.map((customer) =>
                           );
                         })}
                       </div>
-                    </div>
+</div>
                 </form>
                   </div>
                 );
@@ -1519,7 +1518,7 @@ ${selectedCustomers.map((customer) =>
                 <h2 className="text-2xl font-bold text-gray-800">메시지 발송</h2>
                 <p className="text-gray-600">생성된 알림톡 메시지를 확인하고 발송하세요</p>
               </div>
-            </div>
+</div>
 
             <!-- 고정비 등록 폼 -->
             <div class="form-section">
@@ -1576,12 +1575,12 @@ ${selectedCustomers.map((customer) =>
                         <h3 className="text-xl font-bold text-gray-800">{msg.couponCode}</h3>
                         <div className={`bg-gradient-to-r ${fileType === 'wedding' ? 'from-pink-500 to-rose-600' : 'from-green-500 to-emerald-600'} text-white px-4 py-2 rounded-xl font-bold`}>
                           {msg.totalCount}건 / {msg.totalAmount.toLocaleString()}원
-                        </div>
+</div>
                       </div>
                       <div className="bg-gray-50 rounded-xl p-4 font-mono text-sm whitespace-pre-line text-gray-700 border border-gray-200">
                         {msg.message}
                       </div>
-                    </div>
+</div>
                     
                     <div style="text-align: center; margin-top: 20px;">
                         <button type="submit" class="btn btn-success">고정비 등록</button>
@@ -1596,7 +1595,7 @@ ${selectedCustomers.map((customer) =>
                     <h3 style="margin: 0;">등록된 고정비</h3>
                     <span class="toggle-icon" id="fixedExpenseToggle">▼</span>
                   ))}
-                </div>
+</div>
                 <div class="collapsible-content" id="fixedExpenseContent">
                     <div style="overflow-x: auto; margin-top: 20px;">
                         <table class="expense-table">
@@ -1645,9 +1644,9 @@ ${selectedCustomers.map((customer) =>
                     <div key={idx} className={`bg-gradient-to-r ${fileType === 'wedding' ? 'from-pink-100 to-rose-100 border-pink-200' : 'from-green-100 to-emerald-100 border-green-200'} p-4 rounded-2xl shadow-lg border`}>
                       <div className={`font-bold ${fileType === 'wedding' ? 'text-pink-800' : 'text-green-800'} text-lg`}>{msg.couponCode}</div>
                       <div className={`${fileType === 'wedding' ? 'text-pink-600' : 'text-green-600'}`}>{msg.totalCount}건 완료</div>
-                    </div>
+</div>
                   ))}
-                </div>
+</div>
               </div>
             )}
           </div>
@@ -1658,7 +1657,7 @@ ${selectedCustomers.map((customer) =>
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-3xl p-12 text-center">
             <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <Upload className="w-10 h-10 text-white" />
-            </div>
+</div>
             
             <!-- 지출 내역 테이블 -->
             <div class="form-section">
@@ -1689,12 +1688,12 @@ ${selectedCustomers.map((customer) =>
                 <span>🎂 돌잔치 파일</span>
               </div>
               <div className="text-xs mt-2 text-gray-400">파일 형식은 자동으로 감지됩니다</div>
-            </div>
+</div>
         </div>
           </div>
         )}
       </div>
-    </div>
+</div>
   );
 };
 
