@@ -324,7 +324,7 @@
         .canvas-wrapper {
             position: relative;
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             min-height: 450px;
             padding: 20px;
@@ -519,7 +519,7 @@
                         <span id="thisMonthTotal" class="chart-total">총 지출: ₩0</span>
                     </div>
                     <div class="canvas-wrapper">
-                        <canvas id="thisMonthCanvas" width="450" height="450"></canvas>
+                        <canvas id="thisMonthCanvas" width="600" height="450"></canvas>
                     </div>
                 </div>
                 
@@ -530,7 +530,7 @@
                         <span id="nonFixedTotal" class="chart-total">일반 지출: ₩0</span>
                     </div>
                     <div class="canvas-wrapper">
-                        <canvas id="nonFixedCanvas" width="450" height="450"></canvas>
+                        <canvas id="nonFixedCanvas" width="600" height="450"></canvas>
                     </div>
                 </div>
                 
@@ -544,7 +544,7 @@
                         </div>
                     </div>
                     <div class="canvas-wrapper">
-                        <canvas id="comparisonCanvas" width="850" height="450"></canvas>
+                        <canvas id="comparisonCanvas" width="1000" height="450"></canvas>
                     </div>
                 </div>
             </div>
@@ -1034,7 +1034,7 @@
             }
         }
 
-        // 이번 달 고정비 생성
+        // 이번 달 고정비 생성 (당월 1일로 수정)
         async function generateMonthlyExpenses() {
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
@@ -1080,8 +1080,11 @@
                         continue;
                     }
                     
+                    // 고정비는 당월 1일로 설정
+                    const monthFirstDay = new Date(thisYear, thisMonth, 1).toISOString().split('T')[0];
+                    
                     const expense = {
-                        date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0],
+                        date: monthFirstDay,
                         category: fixed.category,
                         description: fixed.description,
                         amount: fixed.amount,
@@ -1096,7 +1099,7 @@
                         addedCount++;
                         // 추가 후 중복 체크 목록에 추가
                         existingFixedExpensesByDescription.add(duplicateCheckKey);
-                        console.log('고정비 추가:', fixed.description);
+                        console.log('고정비 추가 (1일 등록):', fixed.description);
                     } catch (error) {
                         console.error('고정비 생성 오류:', error);
                         alert('고정비 생성 중 오류가 발생했습니다: ' + error.message);
@@ -1108,7 +1111,7 @@
             // 결과 메시지 표시
             let resultMessage = '';
             if (addedCount > 0) {
-                resultMessage += `${addedCount}개의 고정비가 이번 달 지출로 추가되었습니다.`;
+                resultMessage += `${addedCount}개의 고정비가 이번 달 1일 지출로 추가되었습니다.`;
             }
             if (skippedCount > 0) {
                 if (resultMessage) resultMessage += '\n';
@@ -1577,13 +1580,13 @@
             };
         }
 
-        // 파이 차트 그리기
+        // 파이 차트 그리기 (범례와 차트가 겹치지 않도록 개선)
         function drawPieChart(canvasId, data) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
-            const centerX = canvas.width / 2 - 60; // 범례 공간 확보를 위해 왼쪽으로 이동
+            const centerX = 220; // 차트 중심을 왼쪽으로 이동
             const centerY = canvas.height / 2;
-            const radius = Math.min(centerX - 50, centerY - 50); // 반지름 조정
+            const radius = 150; // 적절한 크기
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1603,6 +1606,7 @@
             const colors = getChartColors();
             let currentAngle = -Math.PI / 2;
 
+            // 파이 차트 그리기
             categories.forEach((category, index) => {
                 const sliceAngle = (data[category] / total) * 2 * Math.PI;
                 
@@ -1616,10 +1620,10 @@
                 ctx.stroke();
 
                 // 퍼센트 라벨 (큰 조각만)
-                if (sliceAngle > 0.2) {
+                if (sliceAngle > 0.15) {
                     const labelAngle = currentAngle + sliceAngle / 2;
-                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
-                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.65);
+                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.65);
                     const percentage = ((data[category] / total) * 100).toFixed(1);
                     
                     ctx.fillStyle = '#333';
@@ -1631,68 +1635,64 @@
                 currentAngle += sliceAngle;
             });
 
-            drawLegend(ctx, canvas, categories, colors, data, total, centerX);
+            // 범례 그리기 (오른쪽 공간에 배치)
+            drawLegend(ctx, canvas, categories, colors, data, total);
         }
 
-        // 범례 그리기 (개선된 버전)
-        function drawLegend(ctx, canvas, categories, colors, data, total, chartCenterX) {
-            const legendStartX = Math.max(chartCenterX + 120, canvas.width - 200); // 차트 오른쪽에 배치
-            const legendWidth = 180;
-            let legendY = 40;
+        // 범례 그리기 (개선된 버전 - 차트와 겹치지 않음)
+        function drawLegend(ctx, canvas, categories, colors, data, total) {
+            const legendStartX = 400; // 차트 오른쪽 충분한 여백
+            let legendY = 30;
+            const legendItemHeight = 25;
+            const maxVisibleItems = Math.floor((canvas.height - 60) / legendItemHeight);
             
-            // 범례가 캔버스를 벗어나지 않도록 조정
-            if (legendStartX + legendWidth > canvas.width) {
-                return; // 공간이 부족하면 범례 생략
-            }
-            
-            // 범례 배경 그리기
-            const legendHeight = Math.min(categories.length * 35 + 20, canvas.height - 80);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
-            ctx.fillRect(legendStartX - 10, legendY - 15, legendWidth, legendHeight);
+            // 범례 배경
+            const legendHeight = Math.min(categories.length * legendItemHeight + 20, canvas.height - 40);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.fillRect(legendStartX - 10, legendY - 15, 180, legendHeight);
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
-            ctx.strokeRect(legendStartX - 10, legendY - 15, legendWidth, legendHeight);
+            ctx.strokeRect(legendStartX - 10, legendY - 15, 180, legendHeight);
             
             // 범례 제목
             ctx.fillStyle = '#2c3e50';
-            ctx.font = 'bold 12px Malgun Gothic';
+            ctx.font = 'bold 13px Malgun Gothic';
             ctx.textAlign = 'left';
             ctx.fillText('카테고리별 지출', legendStartX, legendY + 5);
             legendY += 25;
             
-            ctx.font = '10px Malgun Gothic';
+            // 범례 아이템들
+            const visibleCategories = categories.slice(0, maxVisibleItems);
+            ctx.font = '11px Malgun Gothic';
             
-            categories.slice(0, 12).forEach((category, index) => { // 최대 12개만 표시
-                if (legendY > canvas.height - 60) return; // 캔버스 하단 여백 확보
-                
+            visibleCategories.forEach((category, index) => {
                 // 색상 박스
                 ctx.fillStyle = colors[index % colors.length];
-                ctx.fillRect(legendStartX, legendY, 10, 10);
+                ctx.fillRect(legendStartX, legendY - 8, 12, 12);
                 
-                // 텍스트
+                // 카테고리명
                 ctx.fillStyle = '#2c3e50';
+                const categoryText = category.length > 8 ? category.substring(0, 8) + '...' : category;
+                ctx.fillText(categoryText, legendStartX + 18, legendY);
+                
+                // 금액과 퍼센트
                 const amount = data[category];
                 const percentage = ((amount / total) * 100).toFixed(1);
+                const amountText = `₩${(amount/1000).toFixed(0)}K`;
                 
-                // 카테고리명 (길면 잘라내기)
-                const categoryText = category.length > 10 ? category.substring(0, 10) + '...' : category;
-                ctx.fillText(categoryText, legendStartX + 15, legendY + 8);
-                
-                // 금액과 퍼센트 (한 줄로)
-                const amountText = `₩${(amount/1000).toFixed(0)}K (${percentage}%)`;
                 ctx.fillStyle = '#666';
-                ctx.font = '9px Malgun Gothic';
-                ctx.fillText(amountText, legendStartX + 15, legendY + 18);
                 ctx.font = '10px Malgun Gothic';
+                ctx.fillText(`${amountText} (${percentage}%)`, legendStartX + 18, legendY + 12);
+                ctx.font = '11px Malgun Gothic';
                 
-                legendY += 30;
+                legendY += legendItemHeight;
             });
             
             // 더 많은 항목이 있는 경우 표시
-            if (categories.length > 12) {
+            if (categories.length > maxVisibleItems) {
                 ctx.fillStyle = '#888';
                 ctx.font = '9px Malgun Gothic';
-                ctx.fillText(`...외 ${categories.length - 12}개`, legendStartX + 15, legendY + 5);
+                ctx.fillText(`...외 ${categories.length - maxVisibleItems}개`, legendStartX + 18, legendY + 5);
             }
         }
 
@@ -1713,63 +1713,90 @@
                 return;
             }
 
-            const barWidth = 30;
+            const barWidth = 35;
             const maxAmount = Math.max(
                 ...Object.values(lastMonthData),
                 ...Object.values(thisMonthData),
                 1
             );
 
-            const chartHeight = canvas.height - 80;
-            const chartTop = 40;
-            const groupSpacing = Math.min(80, (canvas.width - 150) / allCategories.length);
+            const chartHeight = canvas.height - 100;
+            const chartTop = 60;
+            const availableWidth = canvas.width - 100;
+            const groupSpacing = Math.max(80, availableWidth / allCategories.length);
 
+            // 차트 그리기
             allCategories.forEach((category, index) => {
                 const x = 50 + index * groupSpacing;
                 const lastAmount = lastMonthData[category] || 0;
                 const thisAmount = thisMonthData[category] || 0;
 
+                // 지난 달 막대 (파스텔 핑크)
                 const lastBarHeight = (lastAmount / maxAmount) * chartHeight;
-                ctx.fillStyle = '#D7CCC8'; // 파스텔 브라운 (지난 달)
+                ctx.fillStyle = '#FFB3BA';
                 ctx.fillRect(x, chartTop + chartHeight - lastBarHeight, barWidth, lastBarHeight);
 
+                // 이번 달 막대 (파스텔 블루)
                 const thisBarHeight = (thisAmount / maxAmount) * chartHeight;
-                ctx.fillStyle = '#AED6F1'; // 파스텔 블루 (이번 달)
-                ctx.fillRect(x + barWidth + 5, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
+                ctx.fillStyle = '#BFEFFF';
+                ctx.fillRect(x + barWidth + 8, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
 
+                // 카테고리 라벨
                 ctx.fillStyle = '#2c3e50';
                 ctx.font = '10px Malgun Gothic';
                 ctx.textAlign = 'center';
-                const categoryText = category.length > 6 ? category.substring(0, 6) + '...' : category;
-                ctx.fillText(categoryText, x + barWidth, canvas.height - 10);
+                const categoryText = category.length > 8 ? category.substring(0, 8) + '...' : category;
+                ctx.fillText(categoryText, x + barWidth, canvas.height - 25);
+                
+                // 금액 라벨 (막대 위에)
+                ctx.font = '9px Malgun Gothic';
+                ctx.fillStyle = '#666';
+                if (lastAmount > 0) {
+                    ctx.fillText(`₩${(lastAmount/1000).toFixed(0)}K`, x + barWidth/2, chartTop + chartHeight - lastBarHeight - 5);
+                }
+                if (thisAmount > 0) {
+                    ctx.fillText(`₩${(thisAmount/1000).toFixed(0)}K`, x + barWidth + 8 + barWidth/2, chartTop + chartHeight - thisBarHeight - 5);
+                }
             });
 
-            // 범례 (오른쪽 상단)
-            const legendX = canvas.width - 120;
+            // 범례
+            const legendX = canvas.width - 150;
             ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-            ctx.fillRect(legendX - 10, 5, 110, 50);
+            ctx.fillRect(legendX - 10, 10, 140, 50);
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
-            ctx.strokeRect(legendX - 10, 5, 110, 50);
+            ctx.strokeRect(legendX - 10, 10, 140, 50);
 
-            ctx.fillStyle = '#D7CCC8';
-            ctx.fillRect(legendX, 15, 15, 12);
+            ctx.fillStyle = '#FFB3BA';
+            ctx.fillRect(legendX, 20, 15, 12);
             ctx.fillStyle = '#2c3e50';
             ctx.font = '12px Malgun Gothic';
             ctx.textAlign = 'left';
-            ctx.fillText('지난 달', legendX + 20, 25);
+            ctx.fillText('지난 달', legendX + 20, 30);
 
-            ctx.fillStyle = '#AED6F1';
-            ctx.fillRect(legendX, 35, 15, 12);
-            ctx.fillText('이번 달', legendX + 20, 45);
+            ctx.fillStyle = '#BFEFFF';
+            ctx.fillRect(legendX, 40, 15, 12);
+            ctx.fillText('이번 달', legendX + 20, 50);
         }
 
-        // 차트 색상 팔레트 (파스텔톤)
+        // 파스텔톤 차트 색상 팔레트
         function getChartColors() {
             return [
-                '#AED6F1', '#F8C8DC', '#FFE5B4', '#C8E6C9', '#E1BEE7',
-                '#B2DFDB', '#D7CCC8', '#FFCCBC', '#F8BBD9', '#DCEDC1',
-                '#FFF9C4', '#E8F5E8', '#FCE4EC', '#E3F2FD', '#F3E5F5'
+                '#FFB3BA', // 파스텔 핑크
+                '#BFEFFF', // 파스텔 블루
+                '#FFFFBA', // 파스텔 옐로우
+                '#BAEFBA', // 파스텔 그린
+                '#E0BAFF', // 파스텔 퍼플
+                '#FFDFBA', // 파스텔 오렌지
+                '#BAF2FF', // 파스텔 사이안
+                '#F0BAFF', // 파스텔 매젠타
+                '#BAFFBA', // 파스텔 라임
+                '#FFE5BA', // 파스텔 피치
+                '#CABFFF', // 파스텔 라벤더
+                '#BAFFDF', // 파스텔 민트
+                '#FFBAD2', // 파스텔 로즈
+                '#D2BAFF', // 파스텔 바이올렛
+                '#BAFFE5'  // 파스텔 아쿠아
             ];
         }
 
