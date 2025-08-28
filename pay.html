@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>회사 지출관리 시스템 - Google Sheets 연동</title>
+    <title>회사 지출관리 시스템 - Firebase</title>
     <style>
         * {
             margin: 0;
@@ -46,55 +46,32 @@
             font-size: 1.1em;
         }
 
-        .config-section {
-            background: #fff3cd;
+        .auth-section {
             padding: 20px;
-            border-radius: 10px;
-            margin: 20px;
-            border: 1px solid #ffeaa7;
+            text-align: center;
+            background: #f8f9fa;
+            margin-bottom: 20px;
         }
 
-        .config-section h3 {
-            color: #856404;
-            margin-bottom: 15px;
-        }
-
-        .config-section p {
-            color: #856404;
-            margin-bottom: 15px;
-        }
-
-        .api-url-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e9ecef;
+        .auth-section button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
             border-radius: 8px;
+            cursor: pointer;
             font-size: 1em;
-            margin-bottom: 15px;
-        }
-
-        .sheets-status {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 0.9em;
-            margin-left: 10px;
             font-weight: 600;
+            margin: 0 10px;
         }
 
-        .sheets-status.connected {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .sheets-status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .sheets-status.connecting {
-            background: #fff3cd;
-            color: #856404;
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         .main-content {
@@ -102,7 +79,7 @@
             display: none;
         }
 
-        .main-content.show {
+        .main-content.authenticated {
             display: block;
         }
         
@@ -274,6 +251,24 @@
             padding: 20px;
             color: #7f8c8d;
         }
+
+        .sync-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .sync-status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sync-status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
         
         @media (max-width: 768px) {
             .container {
@@ -324,6 +319,11 @@
             .expense-table td {
                 padding: 8px 6px;
             }
+
+            .user-info {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
     </style>
 </head>
@@ -331,20 +331,26 @@
     <div class="container">
         <div class="header">
             <h1>회사 지출관리 시스템</h1>
-            <p>Google Sheets 연동으로 실시간 동기화되는 지출 관리</p>
+            <p>Firebase 기반 실시간 동기화로 더욱 안전한 지출 관리</p>
         </div>
         
-        <!-- API 설정 섹션 -->
-        <div class="config-section" id="configSection">
-            <h3>Google Apps Script API 설정</h3>
-            <p>Google Apps Script를 배포한 후 웹앱 URL을 입력하세요:</p>
-            <input type="url" id="apiUrl" class="api-url-input" 
-                   placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" 
-                   value="">
-            <div style="margin-top: 10px;">
-                <button class="btn btn-success" onclick="saveApiConfig()">API 설정 저장</button>
-                <button class="btn" onclick="testConnection()">연결 테스트</button>
-                <span class="sheets-status disconnected" id="connectionStatus">연결 안됨</span>
+        <!-- 인증 섹션 -->
+        <div class="auth-section" id="authSection">
+            <div class="loading" id="authLoading">Firebase 초기화 중...</div>
+            <div id="signedOut" style="display: none;">
+                <h3>로그인이 필요합니다</h3>
+                <p>Google 계정으로 로그인하여 안전하게 지출 데이터를 관리하세요</p>
+                <br>
+                <button onclick="signInWithGoogle()">Google 로그인</button>
+            </div>
+            <div id="signedIn" style="display: none;">
+                <div class="user-info">
+                    <div>
+                        <span id="userName">사용자</span>님 안녕하세요
+                        <span class="sync-status" id="syncStatus">연결 확인 중...</span>
+                    </div>
+                    <button onclick="signOut()">로그아웃</button>
+                </div>
             </div>
         </div>
         
@@ -502,9 +508,6 @@
                             </tr>
                         </thead>
                         <tbody id="fixedExpenseTableBody">
-                            <tr>
-                                <td colspan="7" class="loading">고정비 데이터를 불러오는 중...</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -527,9 +530,6 @@
                             </tr>
                         </thead>
                         <tbody id="expenseTableBody">
-                            <tr>
-                                <td colspan="7" class="loading">지출 데이터를 불러오는 중...</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -537,306 +537,366 @@
         </div>
     </div>
 
-    <script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Firebase 설정 및 초기화
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAXr7parhL6wQuUzy4MPvVhV6-J53wzcA",
+            authDomain: "pastelmovie-cac7a.firebaseapp.com",
+            databaseURL: "https://pastelmovie-cac7a-default-rtdb.firebaseio.com",
+            projectId: "pastelmovie-cac7a",
+            storageBucket: "pastelmovie-cac7a.firebasestorage.app",
+            messagingSenderId: "543294016464",
+            appId: "1:543294016464:web:47162285ca02d3cfb587d5",
+            measurementId: "G-LK2Q13294B"
+        };
+
+        // Firebase 앱 초기화
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
         // 전역 변수
         let expenses = [];
         let fixedExpenses = [];
-        let apiUrl = '';
+        let currentUser = null;
+        let expenseUnsubscribe = null;
+        let fixedExpenseUnsubscribe = null;
+
+        // DOM 요소들을 전역으로 설정
+        window.signInWithGoogle = signInWithGoogle;
+        window.signOut = signOut;
+        window.deleteExpenseById = deleteExpenseById;
+        window.deleteFixedExpenseById = deleteFixedExpenseById;
+        window.generateMonthlyExpenses = generateMonthlyExpenses;
+
+        // 인증 상태 변경 감지
+        onAuthStateChanged(auth, (user) => {
+            const authLoading = document.getElementById('authLoading');
+            const signedOut = document.getElementById('signedOut');
+            const signedIn = document.getElementById('signedIn');
+            const mainContent = document.getElementById('mainContent');
+            const userName = document.getElementById('userName');
+
+            authLoading.style.display = 'none';
+
+            if (user) {
+                currentUser = user;
+                signedOut.style.display = 'none';
+                signedIn.style.display = 'block';
+                mainContent.classList.add('authenticated');
+                userName.textContent = user.displayName || user.email;
+                
+                // Firebase 연결 상태 확인
+                updateSyncStatus('online');
+                
+                // 데이터 실시간 구독 시작
+                setupRealtimeListeners();
+                
+                // 페이지 초기화
+                initializePage();
+                
+                console.log('사용자 로그인:', user.email);
+            } else {
+                currentUser = null;
+                signedOut.style.display = 'block';
+                signedIn.style.display = 'none';
+                mainContent.classList.remove('authenticated');
+                
+                // 기존 구독 해제
+                if (expenseUnsubscribe) expenseUnsubscribe();
+                if (fixedExpenseUnsubscribe) fixedExpenseUnsubscribe();
+                
+                updateSyncStatus('offline');
+                console.log('사용자 로그아웃');
+            }
+        });
+
+        // Google 로그인
+        async function signInWithGoogle() {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                console.log('로그인 성공:', result.user.email);
+            } catch (error) {
+                console.error('로그인 오류:', error);
+                alert('로그인 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 로그아웃
+        async function signOut() {
+            try {
+                await firebaseSignOut(auth);
+                expenses = [];
+                fixedExpenses = [];
+                console.log('로그아웃 성공');
+            } catch (error) {
+                console.error('로그아웃 오류:', error);
+                alert('로그아웃 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 동기화 상태 업데이트
+        function updateSyncStatus(status) {
+            const syncStatus = document.getElementById('syncStatus');
+            if (status === 'online') {
+                syncStatus.textContent = '온라인';
+                syncStatus.className = 'sync-status online';
+            } else {
+                syncStatus.textContent = '오프라인';
+                syncStatus.className = 'sync-status offline';
+            }
+        }
+
+        // 실시간 리스너 설정
+        function setupRealtimeListeners() {
+            if (!currentUser) return;
+
+            // 지출 내역 실시간 구독
+            const expensesQuery = query(
+                collection(db, `users/${currentUser.uid}/expenses`),
+                orderBy('date', 'desc')
+            );
+
+            expenseUnsubscribe = onSnapshot(expensesQuery, (snapshot) => {
+                expenses = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                renderExpenseTable();
+                updateSummary();
+                console.log('지출 데이터 실시간 업데이트:', expenses.length, '건');
+            });
+
+            // 고정비 실시간 구독
+            const fixedExpensesQuery = query(
+                collection(db, `users/${currentUser.uid}/fixedExpenses`),
+                orderBy('startDate', 'desc')
+            );
+
+            fixedExpenseUnsubscribe = onSnapshot(fixedExpensesQuery, (snapshot) => {
+                fixedExpenses = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                renderFixedExpenseTable();
+                updateSummary();
+                console.log('고정비 데이터 실시간 업데이트:', fixedExpenses.length, '건');
+            });
+        }
 
         // 페이지 초기화
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('페이지가 로드되었습니다.');
-            
-            // 저장된 API URL 불러오기
-            const savedApiUrl = localStorage.getItem('gasApiUrl');
-            if (savedApiUrl) {
-                document.getElementById('apiUrl').value = savedApiUrl;
-                apiUrl = savedApiUrl;
-                testConnection();
-            }
-            
+        function initializePage() {
             // 오늘 날짜를 기본값으로 설정
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('date').value = today;
             document.getElementById('fixedStartDate').value = today;
             
-            // 폼 이벤트 등록
+            // 폼 제출 이벤트
             document.getElementById('expenseForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('fixedExpenseForm').addEventListener('submit', handleFixedExpenseSubmit);
-        });
-
-        // API 설정 저장
-        function saveApiConfig() {
-            const url = document.getElementById('apiUrl').value.trim();
-            if (!url) {
-                alert('API URL을 입력해주세요.');
-                return;
-            }
-            
-            if (!url.includes('script.google.com')) {
-                alert('올바른 Google Apps Script URL을 입력해주세요.');
-                return;
-            }
-            
-            localStorage.setItem('gasApiUrl', url);
-            apiUrl = url;
-            
-            showSuccessMessage('API 설정이 저장되었습니다.');
-            testConnection();
         }
 
-        // JSONP 요청 함수
-        function makeJsonpRequest(url, callback) {
-            const callbackName = 'jsonpCallback_' + Math.random().toString(36).substr(2, 9);
-            
-            window[callbackName] = function(data) {
-                callback(data);
-                document.head.removeChild(script);
-                delete window[callbackName];
-            };
-            
-            const script = document.createElement('script');
-            script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + callbackName;
-            script.onerror = function() {
-                callback({ success: false, message: '요청 실패' });
-                document.head.removeChild(script);
-                delete window[callbackName];
-            };
-            
-            document.head.appendChild(script);
-        }
-
-        // 연결 테스트 (JSONP 사용)
-        function testConnection() {
-            if (!apiUrl) {
-                updateConnectionStatus('disconnected', '연결 안됨');
-                return;
-            }
-
-            updateConnectionStatus('connecting', '연결 확인 중...');
-            
-            makeJsonpRequest(apiUrl + '?action=getExpenses', function(result) {
-                if (result.success !== undefined) {
-                    updateConnectionStatus('connected', '연결됨');
-                    document.getElementById('configSection').style.display = 'none';
-                    document.getElementById('mainContent').classList.add('show');
-                    loadData();
-                } else {
-                    updateConnectionStatus('disconnected', '연결 실패');
-                    document.getElementById('configSection').style.display = 'block';
-                    document.getElementById('mainContent').classList.remove('show');
-                }
-            });
-        }
-
-        // 연결 상태 업데이트
-        function updateConnectionStatus(status, text) {
-            const statusElement = document.getElementById('connectionStatus');
-            statusElement.className = `sheets-status ${status}`;
-            statusElement.textContent = text;
-        }
-
-        // 모든 데이터 로드
-        async function loadData() {
-            await Promise.all([
-                loadExpenses(),
-                loadFixedExpenses()
-            ]);
-            updateSummary();
-        }
-
-        // 지출 데이터 로드
-        async function loadExpenses() {
-            try {
-                const response = await fetch(apiUrl + '?action=getExpenses');
-                const result = await response.json();
-                
-                if (result.success) {
-                    expenses = result.data || [];
-                    renderExpenseTable();
-                } else {
-                    console.error('Failed to load expenses:', result.message);
-                    expenses = [];
-                }
-            } catch (error) {
-                console.error('Error loading expenses:', error);
-                expenses = [];
-            }
-        }
-
-        // 고정비 데이터 로드
-        async function loadFixedExpenses() {
-            try {
-                const response = await fetch(apiUrl + '?action=getFixedExpenses');
-                const result = await response.json();
-                
-                if (result.success) {
-                    fixedExpenses = result.data || [];
-                    renderFixedExpenseTable();
-                } else {
-                    console.error('Failed to load fixed expenses:', result.message);
-                    fixedExpenses = [];
-                }
-            } catch (error) {
-                console.error('Error loading fixed expenses:', error);
-                fixedExpenses = [];
-            }
-        }
-
-        // 지출 등록 폼 제출 처리 (JSONP 사용)
-        function handleFormSubmit(e) {
+        // 지출 등록 폼 제출 처리
+        async function handleFormSubmit(e) {
             e.preventDefault();
             
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
             const formData = new FormData(e.target);
-            const params = new URLSearchParams({
-                action: 'addExpense',
+            const expense = {
                 date: formData.get('date'),
                 category: formData.get('category'),
                 description: formData.get('description'),
-                amount: formData.get('amount'),
+                amount: parseInt(formData.get('amount')),
                 paymentMethod: formData.get('paymentMethod'),
-                notes: formData.get('notes') || ''
-            });
+                notes: formData.get('notes') || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
 
-            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
-                if (result.success) {
-                    // 폼 리셋
-                    document.getElementById('expenseForm').reset();
-                    const today = new Date().toISOString().split('T')[0];
-                    document.getElementById('date').value = today;
-                    
-                    showSuccessMessage(result.message);
-                    
-                    // 데이터 새로고침
-                    loadExpenses();
-                    setTimeout(updateSummary, 500);
-                } else {
-                    alert('지출 등록 실패: ' + result.message);
-                }
-            });
+            try {
+                await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
+                
+                // 폼 리셋
+                document.getElementById('expenseForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('date').value = today;
+                
+                showSuccessMessage('지출이 성공적으로 등록되었습니다!');
+                console.log('지출 등록 완료:', expense);
+            } catch (error) {
+                console.error('지출 등록 오류:', error);
+                alert('지출 등록 중 오류가 발생했습니다: ' + error.message);
+            }
         }
 
-        // 고정비 등록 폼 제출 처리 (JSONP 사용)
-        function handleFixedExpenseSubmit(e) {
+        // 고정비 등록 폼 제출 처리
+        async function handleFixedExpenseSubmit(e) {
             e.preventDefault();
             
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
             const formData = new FormData(e.target);
-            const params = new URLSearchParams({
-                action: 'addFixedExpense',
+            const fixedExpense = {
                 category: formData.get('fixedCategory'),
                 description: formData.get('fixedDescription'),
-                amount: formData.get('fixedAmount'),
+                amount: parseInt(formData.get('fixedAmount')),
                 paymentMethod: formData.get('fixedPaymentMethod'),
                 startDate: formData.get('fixedStartDate'),
-                notes: formData.get('fixedNotes') || ''
-            });
+                notes: formData.get('fixedNotes') || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
 
-            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
-                if (result.success) {
-                    // 폼 리셋
-                    document.getElementById('fixedExpenseForm').reset();
-                    const today = new Date().toISOString().split('T')[0];
-                    document.getElementById('fixedStartDate').value = today;
+            try {
+                await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
+                
+                // 폼 리셋
+                document.getElementById('fixedExpenseForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('fixedStartDate').value = today;
+                
+                showSuccessMessage('고정비가 성공적으로 등록되었습니다!');
+                console.log('고정비 등록 완료:', fixedExpense);
+            } catch (error) {
+                console.error('고정비 등록 오류:', error);
+                alert('고정비 등록 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 지출 삭제
+        async function deleteExpenseById(expenseId) {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            if (confirm('정말 삭제하시겠습니까?')) {
+                try {
+                    await deleteDoc(doc(db, `users/${currentUser.uid}/expenses`, expenseId));
+                    showSuccessMessage('지출이 삭제되었습니다.');
+                    console.log('지출 삭제 완료:', expenseId);
+                } catch (error) {
+                    console.error('지출 삭제 오류:', error);
+                    alert('지출 삭제 중 오류가 발생했습니다: ' + error.message);
+                }
+            }
+        }
+
+        // 고정비 삭제
+        async function deleteFixedExpenseById(fixedId) {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            if (confirm('정말 삭제하시겠습니까?')) {
+                try {
+                    await deleteDoc(doc(db, `users/${currentUser.uid}/fixedExpenses`, fixedId));
+                    showSuccessMessage('고정비가 삭제되었습니다.');
+                    console.log('고정비 삭제 완료:', fixedId);
+                } catch (error) {
+                    console.error('고정비 삭제 오류:', error);
+                    alert('고정비 삭제 중 오류가 발생했습니다: ' + error.message);
+                }
+            }
+        }
+
+        // 이번 달 고정비 생성
+        async function generateMonthlyExpenses() {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            if (fixedExpenses.length === 0) {
+                alert('등록된 고정비가 없습니다.');
+                return;
+            }
+            
+            const now = new Date();
+            const thisMonth = now.getMonth();
+            const thisYear = now.getFullYear();
+            
+            // 이미 이번 달에 생성된 고정비가 있는지 확인
+            const existingThisMonth = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === thisMonth && 
+                       expenseDate.getFullYear() === thisYear &&
+                       expense.notes && expense.notes.includes('[고정비 자동생성]');
+            });
+            
+            if (existingThisMonth.length > 0) {
+                if (!confirm(`이번 달에 이미 ${existingThisMonth.length}개의 고정비가 생성되어 있습니다.\n다시 생성하시겠습니까?`)) {
+                    return;
+                }
+            }
+            
+            let addedCount = 0;
+            
+            for (const fixed of fixedExpenses) {
+                const fixedStartDate = new Date(fixed.startDate);
+                
+                // 시작일이 현재 월보다 이전이거나 같은 경우에만 생성
+                if (fixedStartDate <= now) {
+                    const expense = {
+                        date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0], // 매월 1일로 설정
+                        category: fixed.category,
+                        description: fixed.description,
+                        amount: fixed.amount,
+                        paymentMethod: fixed.paymentMethod,
+                        notes: fixed.notes ? `${fixed.notes} [고정비 자동생성]` : '[고정비 자동생성]',
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
                     
-                    showSuccessMessage(result.message);
-                    
-                    // 데이터 새로고침
-                    loadFixedExpenses();
-                    setTimeout(updateSummary, 500);
-                } else {
-                    alert('고정비 등록 실패: ' + result.message);
+                    try {
+                        await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
+                        addedCount++;
+                    } catch (error) {
+                        console.error('고정비 생성 오류:', error);
+                        alert('고정비 생성 중 오류가 발생했습니다: ' + error.message);
+                        return;
+                    }
                 }
-            });
-        }
-
-        // 지출 삭제 (JSONP 사용)
-        function deleteExpenseById(rowIndex) {
-            if (!confirm('정말 삭제하시겠습니까?')) {
-                return;
             }
-
-            const params = new URLSearchParams({
-                action: 'deleteExpense',
-                rowIndex: rowIndex
-            });
-
-            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
-                if (result.success) {
-                    showSuccessMessage(result.message);
-                    loadExpenses();
-                    setTimeout(updateSummary, 500);
-                } else {
-                    alert('삭제 실패: ' + result.message);
-                }
-            });
-        }
-
-        // 고정비 삭제 (JSONP 사용)
-        function deleteFixedExpenseById(rowIndex) {
-            if (!confirm('정말 삭제하시겠습니까?')) {
-                return;
+            
+            if (addedCount > 0) {
+                showSuccessMessage(`${addedCount}개의 고정비가 이번 달 지출로 추가되었습니다.`);
+                console.log('고정비 생성 완료:', addedCount, '개');
+            } else {
+                alert('추가할 고정비가 없습니다.');
             }
-
-            const params = new URLSearchParams({
-                action: 'deleteFixedExpense',
-                rowIndex: rowIndex
-            });
-
-            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
-                if (result.success) {
-                    showSuccessMessage(result.message);
-                    loadFixedExpenses();
-                    setTimeout(updateSummary, 500);
-                } else {
-                    alert('삭제 실패: ' + result.message);
-                }
-            });
-        }
-
-        // 이번 달 고정비 생성 (JSONP 사용)
-        function generateMonthlyExpenses() {
-            if (!confirm('이번 달 고정비를 생성하시겠습니까?')) {
-                return;
-            }
-
-            makeJsonpRequest(apiUrl + '?action=generateMonthlyExpenses', function(result) {
-                if (result.success) {
-                    showSuccessMessage(result.message);
-                    loadExpenses();
-                    setTimeout(updateSummary, 500);
-                } else {
-                    alert(result.message);
-                }
-            });
-        }
-
-        // 모든 데이터 로드
-        function loadData() {
-            loadExpenses();
-            loadFixedExpenses();
-            setTimeout(updateSummary, 1000);
         }
 
         // 테이블 렌더링
         function renderExpenseTable() {
             const tbody = document.getElementById('expenseTableBody');
             
-            if (expenses.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="loading">등록된 지출 내역이 없습니다.</td></tr>';
-                return;
-            }
-
             tbody.innerHTML = expenses.map((expense) => {
                 return `
                     <tr>
-                        <td>${expense.date}</td>
+                        <td>${new Date(expense.date).toLocaleDateString('ko-KR')}</td>
                         <td><span style="padding: 4px 8px; background: #e3f2fd; border-radius: 4px; font-size: 0.8em;">${expense.category}</span></td>
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${expense.description}</td>
                         <td style="text-align: right; font-weight: bold; color: #e74c3c;">₩${expense.amount.toLocaleString()}</td>
                         <td>${expense.paymentMethod}</td>
                         <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${expense.notes}</td>
                         <td>
-                            <button class="delete-btn" onclick="deleteExpenseById(${expense.rowIndex})">삭제</button>
+                            <button class="delete-btn" onclick="deleteExpenseById('${expense.id}')">삭제</button>
                         </td>
                     </tr>
                 `;
@@ -846,11 +906,6 @@
         function renderFixedExpenseTable() {
             const tbody = document.getElementById('fixedExpenseTableBody');
             
-            if (fixedExpenses.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="loading">등록된 고정비가 없습니다.</td></tr>';
-                return;
-            }
-
             tbody.innerHTML = fixedExpenses.map((fixed) => {
                 return `
                     <tr>
@@ -858,10 +913,10 @@
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${fixed.description}</td>
                         <td style="text-align: right; font-weight: bold; color: #f39c12;">₩${fixed.amount.toLocaleString()}</td>
                         <td>${fixed.paymentMethod}</td>
-                        <td>${fixed.startDate}</td>
+                        <td>${new Date(fixed.startDate).toLocaleDateString('ko-KR')}</td>
                         <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${fixed.notes}</td>
                         <td>
-                            <button class="delete-btn" onclick="deleteFixedExpenseById(${fixed.rowIndex})">삭제</button>
+                            <button class="delete-btn" onclick="deleteFixedExpenseById('${fixed.id}')">삭제</button>
                         </td>
                     </tr>
                 `;
@@ -936,7 +991,7 @@
             }, 3000);
         }
 
-        console.log('Google Sheets 연동 지출관리 시스템이 초기화되었습니다.');
+        console.log('Firebase 지출관리 시스템이 초기화되었습니다.');
     </script>
 </body>
 </html>
