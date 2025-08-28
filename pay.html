@@ -269,7 +269,7 @@
             background: #f8d7da;
             color: #721c24;
         }
-        
+
         .chart-tabs {
             display: flex;
             margin-bottom: 20px;
@@ -320,7 +320,7 @@
             color: #e74c3c;
             font-size: 1.1em;
         }
-
+        
         @media (max-width: 768px) {
             .container {
                 margin: 5px;
@@ -417,6 +417,10 @@
                     <div class="amount" id="monthlyExpense">₩0</div>
                 </div>
                 <div class="summary-card">
+                    <h4>이번 달 일반지출</h4>
+                    <div class="amount" id="nonFixedExpense">₩0</div>
+                </div>
+                <div class="summary-card">
                     <h4>등록된 항목</h4>
                     <div class="amount" id="totalItems">0건</div>
                 </div>
@@ -426,29 +430,53 @@
                 </div>
             </div>
 
-            <!-- 데이터 가져오기 섹션 -->
+            <!-- 카테고리별 차트 -->
             <div class="form-section">
-                <h3>데이터 가져오기</h3>
-                <p>CSV 파일을 업로드하여 기존 데이터를 가져올 수 있습니다.</p>
+                <h3>카테고리별 지출 분석</h3>
+                <div class="chart-tabs">
+                    <button class="tab-btn active" onclick="showChart('thisMonth')">전체 지출</button>
+                    <button class="tab-btn" onclick="showChart('nonFixed')">일반 지출 (고정비 제외)</button>
+                    <button class="tab-btn" onclick="showChart('comparison')">지난 달과 비교</button>
+                </div>
                 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="csvFile">지출 내역 CSV 파일</label>
-                        <input type="file" id="csvFile" accept=".csv">
-                        <small>CSV 형식: 날짜,카테고리,지출내역,금액,결제방식,비고</small>
+                <!-- 전체 지출 차트 -->
+                <div id="thisMonthChart" class="chart-container">
+                    <div class="chart-header">
+                        <h4>이번 달 카테고리별 지출</h4>
+                        <span id="thisMonthTotal" class="chart-total">총 지출: ₩0</span>
                     </div>
-                    <div class="form-group">
-                        <label for="fixedCsvFile">고정비 CSV 파일</label>
-                        <input type="file" id="fixedCsvFile" accept=".csv">>
-                        <small>CSV 형식: 카테고리,고정비내역,월금액,결제방식,시작일,비고</small>
+                    <div style="text-align: center; padding: 40px;">
+                        <canvas id="thisMonthCanvas" width="400" height="400"></canvas>
                     </div>
                 </div>
                 
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button type="button" id="downloadExpenseSample" class="btn">지출 내역 샘플 CSV 다운로드</button>
-                        <button type="button" id="downloadFixedSample" class="btn">고정비 샘플 CSV 다운로드</button>
+                <!-- 고정비 제외 차트 -->
+                <div id="nonFixedChart" class="chart-container" style="display: none;">
+                    <div class="chart-header">
+                        <h4>이번 달 일반 지출 (고정비 제외)</h4>
+                        <span id="nonFixedTotal" class="chart-total">일반 지출: ₩0</span>
                     </div>
+                    <div style="text-align: center; padding: 40px;">
+                        <canvas id="nonFixedCanvas" width="400" height="400"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 지난 달 비교 차트 -->
+                <div id="comparisonChart" class="chart-container" style="display: none;">
+                    <div class="chart-header">
+                        <h4>지난 달 대비 카테고리별 지출 비교</h4>
+                        <div>
+                            <span id="lastMonthTotal" class="chart-total">지난 달: ₩0</span>
+                            <span id="thisMonthTotalComp" class="chart-total">이번 달: ₩0</span>
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 40px;">
+                        <canvas id="comparisonCanvas" width="800" height="400"></canvas>
+                    </div>
+                </div>
             </div>
+
+            <!-- 새 지출 등록 폼 -->
             <div class="form-section">
                 <h3>새 지출 등록</h3>
                 <form id="expenseForm">
@@ -559,7 +587,7 @@
                     
                     <div style="text-align: center; margin-top: 20px;">
                         <button type="submit" class="btn btn-success">고정비 등록</button>
-                        <button type="button" onclick="window.generateMonthlyExpenses()">이번 달 고정비 생성</button>
+                        <button type="button" id="generateMonthlyBtn" class="btn">이번 달 고정비 생성</button>
                     </div>
                 </form>
             </div>
@@ -650,263 +678,6 @@
         window.generateMonthlyExpenses = generateMonthlyExpenses;
         window.showChart = showChart;
 
-        // DOM 요소들을 전역으로 설정
-        window.signInWithGoogle = signInWithGoogle;
-        window.signOut = signOut;
-        window.deleteExpenseById = deleteExpenseById;
-        window.deleteFixedExpenseById = deleteFixedExpenseById;
-        window.generateMonthlyExpenses = generateMonthlyExpenses;
-        window.handleCsvUpload = handleCsvUpload;
-        window.downloadSampleCsv = downloadSampleCsv;
-
-        async function handleCsvUpload(event, type) {
-            if (!currentUser) {
-                alert('로그인이 필요합니다.');
-                return;
-            }
-
-            const file = event.target.files[0];
-            if (!file) return;
-
-            try {
-                // 다양한 인코딩으로 파일 읽기 시도
-                let text = await readFileWithEncoding(file);
-                
-                const lines = text.split(/\r?\n/).filter(line => line.trim());
-                
-                if (lines.length < 2) {
-                    alert('CSV 파일이 비어있거나 헤더만 있습니다.');
-                    return;
-                }
-
-                // 헤더 제거
-                const dataLines = lines.slice(1);
-                let successCount = 0;
-                let errorCount = 0;
-
-                for (const line of dataLines) {
-                    try {
-                        // CSV 파싱 개선 (따옴표 처리 포함)
-                        const values = parseCSVLine(line);
-                        
-                        if (type === 'expenses') {
-                            // 날짜,카테고리,지출내역,금액,결제방식,비고
-                            if (values.length < 5) continue;
-                            
-                            const expense = {
-                                date: values[0].trim(),
-                                category: values[1].trim(),
-                                description: values[2].trim(),
-                                amount: parseInt(values[3].replace(/[^0-9]/g, '')) || 0,
-                                paymentMethod: values[4].trim(),
-                                notes: (values[5] || '').trim(),
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString()
-                            };
-
-                            // 필수 필드 검증
-                            if (expense.date && expense.category && expense.description && expense.amount > 0) {
-                                await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
-                                successCount++;
-                            } else {
-                                errorCount++;
-                            }
-                            
-                        } else if (type === 'fixedExpenses') {
-                            // 카테고리,고정비내역,월금액,결제방식,시작일,비고
-                            if (values.length < 5) continue;
-                            
-                            const fixedExpense = {
-                                category: values[0].trim(),
-                                description: values[1].trim(),
-                                amount: parseInt(values[2].replace(/[^0-9]/g, '')) || 0,
-                                paymentMethod: values[3].trim(),
-                                startDate: values[4].trim(),
-                                notes: (values[5] || '').trim(),
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString()
-                            };
-
-                            // 필수 필드 검증
-                            if (fixedExpense.category && fixedExpense.description && fixedExpense.amount > 0) {
-                                await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
-                                successCount++;
-                            } else {
-                                errorCount++;
-                            }
-                        }
-                        
-                    } catch (error) {
-                        console.error('데이터 행 처리 오류:', error, 'Line:', line);
-                        errorCount++;
-                    }
-                }
-
-                alert(`데이터 가져오기 완료!\n성공: ${successCount}건\n실패: ${errorCount}건`);
-                
-            } catch (error) {
-                console.error('파일 읽기 오류:', error);
-                alert('파일을 읽는 중 오류가 발생했습니다. UTF-8 인코딩으로 저장된 CSV 파일을 사용해주세요.');
-            }
-            
-            // 파일 input 초기화
-            event.target.value = '';
-        }
-
-        // 다양한 인코딩으로 파일 읽기
-        async function readFileWithEncoding(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            
-            // UTF-8 BOM 확인
-            if (uint8Array.length >= 3 && uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
-                const decoder = new TextDecoder('utf-8');
-                return decoder.decode(uint8Array.slice(3));
-            }
-            
-            // UTF-8로 먼저 시도
-            try {
-                const decoder = new TextDecoder('utf-8');
-                const text = decoder.decode(uint8Array);
-                
-                // UTF-8 디코딩 결과에 한글이 포함되어 있고 깨지지 않은 경우
-                if (isValidKoreanText(text)) {
-                    return text;
-                }
-            } catch (error) {
-                console.log('UTF-8 디코딩 실패:', error);
-            }
-            
-            // 수동으로 CP949/EUC-KR 디코딩 시도
-            try {
-                return decodeKoreanBytes(uint8Array);
-            } catch (error) {
-                console.log('한글 디코딩 실패, UTF-8로 fallback');
-                // 최종적으로 UTF-8로 강제 디코딩
-                const decoder = new TextDecoder('utf-8', { fatal: false });
-                return decoder.decode(uint8Array);
-            }
-        }
-
-        // 한글 텍스트가 유효한지 확인
-        function isValidKoreanText(text) {
-            // 한글 완성형 문자가 포함되어 있는지 확인
-            const koreanRegex = /[가-힣]/;
-            if (!koreanRegex.test(text)) {
-                return false; // 한글이 없으면 유효하지 않다고 판단
-            }
-            
-            // 깨진 문자(replacement character) 확인
-            if (text.includes('\uFFFD')) {
-                return false;
-            }
-            
-            return true;
-        }
-
-        // 한글 바이트 수동 디코딩 (간단한 CP949/EUC-KR 처리)
-        function decodeKoreanBytes(bytes) {
-            let result = '';
-            let i = 0;
-            
-            while (i < bytes.length) {
-                const byte1 = bytes[i];
-                
-                // ASCII 범위 (0-127)
-                if (byte1 < 128) {
-                    result += String.fromCharCode(byte1);
-                    i++;
-                } else if (i + 1 < bytes.length) {
-                    // 2바이트 문자 (한글 등)
-                    const byte2 = bytes[i + 1];
-                    
-                    // CP949/EUC-KR 한글 범위 대략적 처리
-                    if (byte1 >= 0xA1 && byte1 <= 0xFE && byte2 >= 0xA1 && byte2 <= 0xFE) {
-                        // 간단한 한글 매핑 (완벽하지 않지만 대부분의 한글 처리 가능)
-                        const code = ((byte1 - 0xA1) * 94) + (byte2 - 0xA1);
-                        
-                        // 한글 완성형 범위로 변환 (근사치)
-                        if (code >= 0 && code < 2350) {
-                            const unicode = 0xAC00 + Math.floor(code * 11172 / 2350);
-                            result += String.fromCharCode(unicode);
-                        } else {
-                            // 변환할 수 없는 경우 원래 문자 유지
-                            result += String.fromCharCode(byte1) + String.fromCharCode(byte2);
-                        }
-                    } else {
-                        // 일반 2바이트 문자
-                        try {
-                            const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
-                            const char = utf8Decoder.decode(new Uint8Array([byte1, byte2]));
-                            result += char;
-                        } catch {
-                            result += String.fromCharCode(byte1) + String.fromCharCode(byte2);
-                        }
-                    }
-                    i += 2;
-                } else {
-                    // 마지막 바이트
-                    result += String.fromCharCode(byte1);
-                    i++;
-                }
-            }
-            
-            return result;
-        }
-
-        // CSV 라인 파싱 (따옴표 처리 포함)
-        function parseCSVLine(line) {
-            const values = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                const nextChar = line[i + 1];
-                
-                if (char === '"' && !inQuotes) {
-                    inQuotes = true;
-                } else if (char === '"' && inQuotes && nextChar === '"') {
-                    current += '"';
-                    i++; // 다음 따옴표 건너뛰기
-                } else if (char === '"' && inQuotes) {
-                    inQuotes = false;
-                } else if (char === ',' && !inQuotes) {
-                    values.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            values.push(current); // 마지막 값 추가
-            return values;
-        }
-
-        // 샘플 CSV 다운로드
-        function downloadSampleCsv(type) {
-            let csvContent = '';
-            let filename = '';
-
-            if (type === 'expenses') {
-                csvContent = '날짜,카테고리,지출내역,금액,결제방식,비고\n';
-                csvContent += '2024-01-15,사무용품,A4 용지 구매,5000,법인카드,복사용지\n';
-                csvContent += '2024-01-16,식비,점심 식사,12000,현금,팀 회식\n';
-                filename = 'expenses_sample.csv';
-            } else {
-                csvContent = '카테고리,고정비내역,월금액,결제방식,시작일,비고\n';
-                csvContent += '임대료,사무실 임대료,500000,자동이체,2024-01-01,월세\n';
-                csvContent += '통신비,인터넷 요금,55000,자동이체,2024-01-01,광랜\n';
-                filename = 'fixed_expenses_sample.csv';
-            }
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-        }
-
         // 인증 상태 변경 감지
         onAuthStateChanged(auth, (user) => {
             const authLoading = document.getElementById('authLoading');
@@ -924,13 +695,8 @@
                 mainContent.classList.add('authenticated');
                 userName.textContent = user.displayName || user.email;
                 
-                // Firebase 연결 상태 확인
                 updateSyncStatus('online');
-                
-                // 데이터 실시간 구독 시작
                 setupRealtimeListeners();
-                
-                // 페이지 초기화
                 initializePage();
                 
                 console.log('사용자 로그인:', user.email);
@@ -940,20 +706,22 @@
                 signedIn.style.display = 'none';
                 mainContent.classList.remove('authenticated');
                 
-                // 기존 구독 해제
                 if (expenseUnsubscribe) expenseUnsubscribe();
                 if (fixedExpenseUnsubscribe) fixedExpenseUnsubscribe();
                 
                 updateSyncStatus('offline');
                 
-                // 로그인 버튼 이벤트 연결 (DOM이 준비된 후)
                 setTimeout(() => {
                     const googleSignInBtn = document.getElementById('googleSignInBtn');
+                    const signOutBtn = document.getElementById('signOutBtn');
+                    
                     if (googleSignInBtn) {
                         console.log('로그인 버튼 이벤트 연결');
                         googleSignInBtn.addEventListener('click', signInWithGoogle);
-                    } else {
-                        console.error('로그인 버튼을 찾을 수 없습니다');
+                    }
+                    
+                    if (signOutBtn) {
+                        signOutBtn.addEventListener('click', signOut);
                     }
                 }, 100);
                 
@@ -1001,7 +769,6 @@
         function setupRealtimeListeners() {
             if (!currentUser) return;
 
-            // 지출 내역 실시간 구독
             const expensesQuery = query(
                 collection(db, `users/${currentUser.uid}/expenses`),
                 orderBy('date', 'desc')
@@ -1017,7 +784,6 @@
                 console.log('지출 데이터 실시간 업데이트:', expenses.length, '건');
             });
 
-            // 고정비 실시간 구독
             const fixedExpensesQuery = query(
                 collection(db, `users/${currentUser.uid}/fixedExpenses`),
                 orderBy('startDate', 'desc')
@@ -1036,7 +802,6 @@
 
         // 페이지 초기화
         function initializePage() {
-            // 오늘 날짜를 기본값으로 설정
             const today = new Date().toISOString().split('T')[0];
             const dateInput = document.getElementById('date');
             const fixedStartDateInput = document.getElementById('fixedStartDate');
@@ -1044,9 +809,9 @@
             if (dateInput) dateInput.value = today;
             if (fixedStartDateInput) fixedStartDateInput.value = today;
             
-            // 폼 제출 이벤트
             const expenseForm = document.getElementById('expenseForm');
             const fixedExpenseForm = document.getElementById('fixedExpenseForm');
+            const generateMonthlyBtn = document.getElementById('generateMonthlyBtn');
             
             if (expenseForm) {
                 expenseForm.removeEventListener('submit', handleFormSubmit);
@@ -1056,14 +821,6 @@
             if (fixedExpenseForm) {
                 fixedExpenseForm.removeEventListener('submit', handleFixedExpenseSubmit);
                 fixedExpenseForm.addEventListener('submit', handleFixedExpenseSubmit);
-            }
-            
-            // 버튼 이벤트 리스너
-            const signOutBtn = document.getElementById('signOutBtn');
-            const generateMonthlyBtn = document.getElementById('generateMonthlyBtn');
-            
-            if (signOutBtn) {
-                signOutBtn.onclick = signOut;
             }
             
             if (generateMonthlyBtn) {
@@ -1095,7 +852,6 @@
             try {
                 await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
                 
-                // 폼 리셋
                 document.getElementById('expenseForm').reset();
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('date').value = today;
@@ -1132,7 +888,6 @@
             try {
                 await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
                 
-                // 폼 리셋
                 document.getElementById('fixedExpenseForm').reset();
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('fixedStartDate').value = today;
@@ -1213,7 +968,6 @@
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             
-            // 이미 이번 달에 생성된 고정비가 있는지 확인
             const existingThisMonth = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
                 return expenseDate.getMonth() === thisMonth && 
@@ -1232,10 +986,9 @@
             for (const fixed of fixedExpenses) {
                 const fixedStartDate = new Date(fixed.startDate);
                 
-                // 시작일이 현재 월보다 이전이거나 같은 경우에만 생성
                 if (fixedStartDate <= now) {
                     const expense = {
-                        date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0], // 매월 1일로 설정
+                        date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0],
                         category: fixed.category,
                         description: fixed.description,
                         amount: fixed.amount,
@@ -1284,7 +1037,6 @@
                 `;
             }).join('');
             
-            // 삭제 버튼 이벤트 리스너 추가
             tbody.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const expenseId = e.target.getAttribute('data-expense-id');
@@ -1312,7 +1064,6 @@
                 `;
             }).join('');
             
-            // 삭제 버튼 이벤트 리스너 추가
             tbody.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const fixedId = e.target.getAttribute('data-fixed-id');
@@ -1334,31 +1085,36 @@
             
             const thisMonth = thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
             
-            // 고정비 월 합계 계산
+            // 고정비 제외 계산
+            const thisMonthNonFixed = thisMonthExpenses.filter(expense => 
+                !expense.notes || !expense.notes.includes('[고정비 자동생성]')
+            ).reduce((sum, expense) => sum + expense.amount, 0);
+            
             const monthlyFixedTotal = fixedExpenses.reduce((sum, fixed) => sum + fixed.amount, 0);
             
-            // 화면 업데이트
             document.getElementById('totalExpense').textContent = `₩${total.toLocaleString()}`;
             document.getElementById('monthlyExpense').textContent = `₩${thisMonth.toLocaleString()}`;
+            document.getElementById('nonFixedExpense').textContent = `₩${thisMonthNonFixed.toLocaleString()}`;
             document.getElementById('totalItems').textContent = `${expenses.length}건`;
             document.getElementById('averageExpense').textContent = `₩${monthlyFixedTotal.toLocaleString()}`;
             
-            // 차트 업데이트
             updateCharts();
         }
 
         // 차트 탭 전환
         function showChart(type) {
-            // 탭 버튼 활성화 상태 변경
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
             
-            // 차트 컨테이너 표시/숨김
+            document.getElementById('thisMonthChart').style.display = 'none';
+            document.getElementById('nonFixedChart').style.display = 'none';
+            document.getElementById('comparisonChart').style.display = 'none';
+            
             if (type === 'thisMonth') {
                 document.getElementById('thisMonthChart').style.display = 'block';
-                document.getElementById('comparisonChart').style.display = 'none';
+            } else if (type === 'nonFixed') {
+                document.getElementById('nonFixedChart').style.display = 'block';
             } else {
-                document.getElementById('thisMonthChart').style.display = 'none';
                 document.getElementById('comparisonChart').style.display = 'block';
             }
             
@@ -1368,22 +1124,34 @@
         // 차트 업데이트
         function updateCharts() {
             drawThisMonthChart();
+            drawNonFixedChart();
             drawComparisonChart();
         }
 
-        // 이번 달 차트 그리기
+        // 이번 달 전체 차트 그리기
         function drawThisMonthChart() {
             const thisMonthData = getThisMonthData();
             const categoryData = thisMonthData.categories;
             const total = thisMonthData.total;
             const monthInfo = thisMonthData.monthInfo;
 
-            // 총액 업데이트
             document.getElementById('thisMonthTotal').textContent = 
                 `${monthInfo} 총 지출: ₩${total.toLocaleString()}`;
 
-            // 차트 그리기
             drawPieChart('thisMonthCanvas', categoryData);
+        }
+
+        // 고정비 제외 차트 그리기
+        function drawNonFixedChart() {
+            const nonFixedData = getNonFixedMonthData();
+            const categoryData = nonFixedData.categories;
+            const total = nonFixedData.total;
+            const monthInfo = nonFixedData.monthInfo;
+
+            document.getElementById('nonFixedTotal').textContent = 
+                `${monthInfo} 일반 지출: ₩${total.toLocaleString()}`;
+
+            drawPieChart('nonFixedCanvas', categoryData);
         }
 
         // 지난 달 비교 차트 그리기
@@ -1395,17 +1163,15 @@
             const thisMonthTotal = comparisonData.thisMonth.total;
             const lastMonthTotal = comparisonData.lastMonth.total;
 
-            // 총액 업데이트
             document.getElementById('thisMonthTotalComp').textContent = 
                 `${comparisonData.thisMonth.monthInfo}: ₩${thisMonthTotal.toLocaleString()}`;
             document.getElementById('lastMonthTotal').textContent = 
                 `${comparisonData.lastMonth.monthInfo}: ₩${lastMonthTotal.toLocaleString()}`;
 
-            // 비교 차트 그리기
             drawComparisonBarChart('comparisonCanvas', lastMonthData, thisMonthData);
         }
 
-        // 이번 달 데이터 가져오기
+        // 이번 달 전체 데이터 가져오기
         function getThisMonthData() {
             if (expenses.length === 0) {
                 return {
@@ -1443,6 +1209,45 @@
             };
         }
 
+        // 고정비 제외 데이터 가져오기
+        function getNonFixedMonthData() {
+            if (expenses.length === 0) {
+                return {
+                    categories: {},
+                    total: 0,
+                    monthInfo: '이번 달'
+                };
+            }
+
+            const now = new Date();
+            const targetYear = now.getFullYear();
+            const targetMonth = now.getMonth();
+
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === targetMonth && 
+                       expenseDate.getFullYear() === targetYear &&
+                       (!expense.notes || !expense.notes.includes('[고정비 자동생성]'));
+            });
+
+            const categoryData = {};
+            let total = 0;
+
+            filteredExpenses.forEach(expense => {
+                categoryData[expense.category] = (categoryData[expense.category] || 0) + expense.amount;
+                total += expense.amount;
+            });
+
+            const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+            const monthInfo = `${targetYear}년 ${monthNames[targetMonth]}`;
+
+            return {
+                categories: categoryData,
+                total: total,
+                monthInfo: monthInfo
+            };
+        }
+
         // 비교 데이터 가져오기
         function getComparisonData() {
             if (expenses.length === 0) {
@@ -1456,21 +1261,18 @@
             const thisMonthDate = new Date(now.getFullYear(), now.getMonth());
             const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
 
-            // 이번 달 데이터
             const thisMonthExpenses = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
                 return expenseDate.getMonth() === thisMonthDate.getMonth() && 
                        expenseDate.getFullYear() === thisMonthDate.getFullYear();
             });
 
-            // 지난 달 데이터  
             const lastMonthExpenses = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
                 return expenseDate.getMonth() === lastMonthDate.getMonth() && 
                        expenseDate.getFullYear() === lastMonthDate.getFullYear();
             });
 
-            // 카테고리별 집계
             const thisMonthData = {};
             const lastMonthData = {};
             let thisMonthTotal = 0;
@@ -1510,7 +1312,6 @@
             const centerY = canvas.height / 2;
             const radius = Math.min(centerX, centerY) - 20;
 
-            // 캔버스 초기화
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const categories = Object.keys(data);
@@ -1520,19 +1321,18 @@
                 ctx.font = '16px Malgun Gothic';
                 ctx.fillStyle = '#7f8c8d';
                 ctx.textAlign = 'center';
-                ctx.fillText('이번 달 지출 데이터가 없습니다', centerX, centerY - 10);
+                ctx.fillText('지출 데이터가 없습니다', centerX, centerY - 10);
                 ctx.font = '14px Malgun Gothic';
                 ctx.fillText('새 지출을 등록해보세요', centerX, centerY + 15);
                 return;
             }
 
             const colors = getChartColors();
-            let currentAngle = -Math.PI / 2; // 12시 방향부터 시작
+            let currentAngle = -Math.PI / 2;
 
             categories.forEach((category, index) => {
                 const sliceAngle = (data[category] / total) * 2 * Math.PI;
                 
-                // 파이 슬라이스 그리기
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);
                 ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
@@ -1542,7 +1342,6 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // 퍼센티지 라벨 (5% 이상인 경우만)
                 if (sliceAngle > 0.1) {
                     const labelAngle = currentAngle + sliceAngle / 2;
                     const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
@@ -1558,7 +1357,6 @@
                 currentAngle += sliceAngle;
             });
 
-            // 범례 그리기
             drawLegend(ctx, canvas, categories, colors, data, total);
         }
 
@@ -1571,11 +1369,9 @@
             ctx.textAlign = 'left';
             
             categories.forEach((category, index) => {
-                // 색상 박스
                 ctx.fillStyle = colors[index % colors.length];
                 ctx.fillRect(legendX, legendY, 15, 15);
                 
-                // 카테고리명과 금액
                 ctx.fillStyle = '#2c3e50';
                 const amount = data[category];
                 const percentage = ((amount / total) * 100).toFixed(1);
@@ -1591,10 +1387,8 @@
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
             
-            // 캔버스 초기화
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 모든 카테고리 수집
             const allCategories = [...new Set([...Object.keys(lastMonthData), ...Object.keys(thisMonthData)])];
             
             if (allCategories.length === 0) {
@@ -1621,24 +1415,20 @@
                 const lastAmount = lastMonthData[category] || 0;
                 const thisAmount = thisMonthData[category] || 0;
 
-                // 지난 달 막대
                 const lastBarHeight = (lastAmount / maxAmount) * chartHeight;
                 ctx.fillStyle = '#95a5a6';
                 ctx.fillRect(x, chartTop + chartHeight - lastBarHeight, barWidth, lastBarHeight);
 
-                // 이번 달 막대
                 const thisBarHeight = (thisAmount / maxAmount) * chartHeight;
                 ctx.fillStyle = '#3498db';
                 ctx.fillRect(x + barWidth + 5, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
 
-                // 카테고리 라벨
                 ctx.fillStyle = '#2c3e50';
                 ctx.font = '10px Malgun Gothic';
                 ctx.textAlign = 'center';
                 ctx.fillText(category.substring(0, 6), x + barWidth, canvas.height - 10);
             });
 
-            // 범례
             ctx.fillStyle = '#95a5a6';
             ctx.fillRect(canvas.width - 150, 10, 20, 15);
             ctx.fillStyle = '#2c3e50';
@@ -1678,7 +1468,6 @@
             `;
             messageDiv.textContent = message;
             
-            // CSS 애니메이션 추가
             if (!document.getElementById('success-message-style')) {
                 const style = document.createElement('style');
                 style.id = 'success-message-style';
@@ -1693,7 +1482,6 @@
             
             document.body.appendChild(messageDiv);
             
-            // 3초 후 자동 제거
             setTimeout(() => {
                 messageDiv.style.animation = 'slideIn 0.3s ease reverse';
                 setTimeout(() => {
