@@ -341,7 +341,7 @@
                 <h3>로그인이 필요합니다</h3>
                 <p>Google 계정으로 로그인하여 안전하게 지출 데이터를 관리하세요</p>
                 <br>
-                <button onclick="signInWithGoogle()">Google 로그인</button>
+                <button id="googleSignInBtn">Google 로그인</button>
             </div>
             <div id="signedIn" style="display: none;">
                 <div class="user-info">
@@ -349,7 +349,7 @@
                         <span id="userName">사용자</span>님 안녕하세요
                         <span class="sync-status" id="syncStatus">연결 확인 중...</span>
                     </div>
-                    <button onclick="signOut()">로그아웃</button>
+                    <button id="signOutBtn">로그아웃</button>
                 </div>
             </div>
         </div>
@@ -383,20 +383,20 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="csvFile">지출 내역 CSV 파일</label>
-                        <input type="file" id="csvFile" accept=".csv" onchange="handleCsvUpload(event, 'expenses')">
+                        <input type="file" id="csvFile" accept=".csv">
                         <small>CSV 형식: 날짜,카테고리,지출내역,금액,결제방식,비고</small>
                     </div>
                     <div class="form-group">
                         <label for="fixedCsvFile">고정비 CSV 파일</label>
-                        <input type="file" id="fixedCsvFile" accept=".csv" onchange="handleCsvUpload(event, 'fixedExpenses')">
+                        <input type="file" id="fixedCsvFile" accept=".csv">>
                         <small>CSV 형식: 카테고리,고정비내역,월금액,결제방식,시작일,비고</small>
                     </div>
                 </div>
                 
-                <div style="text-align: center; margin-top: 20px;">
-                    <button type="button" class="btn" onclick="downloadSampleCsv('expenses')">지출 내역 샘플 CSV 다운로드</button>
-                    <button type="button" class="btn" onclick="downloadSampleCsv('fixedExpenses')">고정비 샘플 CSV 다운로드</button>
-                </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button type="button" id="downloadExpenseSample" class="btn">지출 내역 샘플 CSV 다운로드</button>
+                        <button type="button" id="downloadFixedSample" class="btn">고정비 샘플 CSV 다운로드</button>
+                    </div>
             </div>
             <div class="form-section">
                 <h3>새 지출 등록</h3>
@@ -508,7 +508,7 @@
                     
                     <div style="text-align: center; margin-top: 20px;">
                         <button type="submit" class="btn btn-success">고정비 등록</button>
-                        <button type="button" class="btn" onclick="generateMonthlyExpenses()">이번 달 고정비 생성</button>
+                        <button type="button" id="generateMonthlyBtn" class="btn">이번 달 고정비 생성</button>
                     </div>
                 </form>
             </div>
@@ -696,39 +696,103 @@
 
         // 다양한 인코딩으로 파일 읽기
         async function readFileWithEncoding(file) {
-            // 먼저 UTF-8로 시도
-            try {
-                const arrayBuffer = await file.arrayBuffer();
+            const arrayBuffer = await file.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            
+            // UTF-8 BOM 확인
+            if (uint8Array.length >= 3 && uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
                 const decoder = new TextDecoder('utf-8');
-                const text = decoder.decode(arrayBuffer);
+                return decoder.decode(uint8Array.slice(3));
+            }
+            
+            // UTF-8로 먼저 시도
+            try {
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(uint8Array);
                 
-                // 한글이 제대로 표시되는지 확인 (일반적인 한글 유니코드 범위)
-                if (!/[\uAC00-\uD7A3]/.test(text) && /[가-힣]/.test(file.name)) {
-                    // UTF-8로 읽었는데 한글이 없고 파일명에 한글이 있다면 다른 인코딩 시도
-                    throw new Error('Try other encoding');
+                // UTF-8 디코딩 결과에 한글이 포함되어 있고 깨지지 않은 경우
+                if (isValidKoreanText(text)) {
+                    return text;
                 }
-                
-                return text;
             } catch (error) {
-                // EUC-KR 시도
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const decoder = new TextDecoder('euc-kr');
-                    return decoder.decode(arrayBuffer);
-                } catch (error2) {
-                    // CP949 시도
-                    try {
-                        const arrayBuffer = await file.arrayBuffer();
-                        const decoder = new TextDecoder('cp949');
-                        return decoder.decode(arrayBuffer);
-                    } catch (error3) {
-                        // 기본 UTF-8 반환
-                        const arrayBuffer = await file.arrayBuffer();
-                        const decoder = new TextDecoder('utf-8');
-                        return decoder.decode(arrayBuffer);
+                console.log('UTF-8 디코딩 실패:', error);
+            }
+            
+            // 수동으로 CP949/EUC-KR 디코딩 시도
+            try {
+                return decodeKoreanBytes(uint8Array);
+            } catch (error) {
+                console.log('한글 디코딩 실패, UTF-8로 fallback');
+                // 최종적으로 UTF-8로 강제 디코딩
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                return decoder.decode(uint8Array);
+            }
+        }
+
+        // 한글 텍스트가 유효한지 확인
+        function isValidKoreanText(text) {
+            // 한글 완성형 문자가 포함되어 있는지 확인
+            const koreanRegex = /[가-힣]/;
+            if (!koreanRegex.test(text)) {
+                return false; // 한글이 없으면 유효하지 않다고 판단
+            }
+            
+            // 깨진 문자(replacement character) 확인
+            if (text.includes('\uFFFD')) {
+                return false;
+            }
+            
+            return true;
+        }
+
+        // 한글 바이트 수동 디코딩 (간단한 CP949/EUC-KR 처리)
+        function decodeKoreanBytes(bytes) {
+            let result = '';
+            let i = 0;
+            
+            while (i < bytes.length) {
+                const byte1 = bytes[i];
+                
+                // ASCII 범위 (0-127)
+                if (byte1 < 128) {
+                    result += String.fromCharCode(byte1);
+                    i++;
+                } else if (i + 1 < bytes.length) {
+                    // 2바이트 문자 (한글 등)
+                    const byte2 = bytes[i + 1];
+                    
+                    // CP949/EUC-KR 한글 범위 대략적 처리
+                    if (byte1 >= 0xA1 && byte1 <= 0xFE && byte2 >= 0xA1 && byte2 <= 0xFE) {
+                        // 간단한 한글 매핑 (완벽하지 않지만 대부분의 한글 처리 가능)
+                        const code = ((byte1 - 0xA1) * 94) + (byte2 - 0xA1);
+                        
+                        // 한글 완성형 범위로 변환 (근사치)
+                        if (code >= 0 && code < 2350) {
+                            const unicode = 0xAC00 + Math.floor(code * 11172 / 2350);
+                            result += String.fromCharCode(unicode);
+                        } else {
+                            // 변환할 수 없는 경우 원래 문자 유지
+                            result += String.fromCharCode(byte1) + String.fromCharCode(byte2);
+                        }
+                    } else {
+                        // 일반 2바이트 문자
+                        try {
+                            const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+                            const char = utf8Decoder.decode(new Uint8Array([byte1, byte2]));
+                            result += char;
+                        } catch {
+                            result += String.fromCharCode(byte1) + String.fromCharCode(byte2);
+                        }
                     }
+                    i += 2;
+                } else {
+                    // 마지막 바이트
+                    result += String.fromCharCode(byte1);
+                    i++;
                 }
             }
+            
+            return result;
         }
 
         // CSV 라인 파싱 (따옴표 처리 포함)
@@ -909,6 +973,19 @@
             // 폼 제출 이벤트
             document.getElementById('expenseForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('fixedExpenseForm').addEventListener('submit', handleFixedExpenseSubmit);
+            
+            // 버튼 이벤트 리스너
+            document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
+            document.getElementById('signOutBtn')?.addEventListener('click', signOut);
+            document.getElementById('generateMonthlyBtn')?.addEventListener('click', generateMonthlyExpenses);
+            document.getElementById('downloadExpenseSample')?.addEventListener('click', () => downloadSampleCsv('expenses'));
+            document.getElementById('downloadFixedSample')?.addEventListener('click', () => downloadSampleCsv('fixedExpenses'));
+            
+            // 파일 업로드 이벤트
+            document.getElementById('csvFile')?.addEventListener('change', (e) => previewCsv(e, 'expenses'));
+            document.getElementById('fixedCsvFile')?.addEventListener('change', (e) => previewCsv(e, 'fixedExpenses'));
+            document.getElementById('uploadCsvBtn')?.addEventListener('click', () => uploadPreviewedCsv('expenses'));
+            document.getElementById('uploadFixedCsvBtn')?.addEventListener('click', () => uploadPreviewedCsv('fixedExpenses'));
         }
 
         // 지출 등록 폼 제출 처리
@@ -1118,11 +1195,19 @@
                         <td>${expense.paymentMethod}</td>
                         <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${expense.notes}</td>
                         <td>
-                            <button class="delete-btn" onclick="deleteExpenseById('${expense.id}')">삭제</button>
+                            <button class="delete-btn" data-expense-id="${expense.id}">삭제</button>
                         </td>
                     </tr>
                 `;
             }).join('');
+            
+            // 삭제 버튼 이벤트 리스너 추가
+            tbody.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const expenseId = e.target.getAttribute('data-expense-id');
+                    deleteExpenseById(expenseId);
+                });
+            });
         }
 
         function renderFixedExpenseTable() {
@@ -1138,11 +1223,19 @@
                         <td>${new Date(fixed.startDate).toLocaleDateString('ko-KR')}</td>
                         <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${fixed.notes}</td>
                         <td>
-                            <button class="delete-btn" onclick="deleteFixedExpenseById('${fixed.id}')">삭제</button>
+                            <button class="delete-btn" data-fixed-id="${fixed.id}">삭제</button>
                         </td>
                     </tr>
                 `;
             }).join('');
+            
+            // 삭제 버튼 이벤트 리스너 추가
+            tbody.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const fixedId = e.target.getAttribute('data-fixed-id');
+                    deleteFixedExpenseById(fixedId);
+                });
+            });
         }
 
         // 요약 업데이트
