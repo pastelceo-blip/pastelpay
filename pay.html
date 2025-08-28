@@ -604,70 +604,155 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const text = await file.text();
-            const lines = text.split('\n').filter(line => line.trim());
-            
-            if (lines.length < 2) {
-                alert('CSV 파일이 비어있거나 헤더만 있습니다.');
-                return;
-            }
-
-            // 헤더 제거
-            const dataLines = lines.slice(1);
-            let successCount = 0;
-            let errorCount = 0;
-
-            for (const line of dataLines) {
-                try {
-                    const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-                    
-                    if (type === 'expenses') {
-                        // 날짜,카테고리,지출내역,금액,결제방식,비고
-                        if (values.length < 5) continue;
-                        
-                        const expense = {
-                            date: values[0],
-                            category: values[1],
-                            description: values[2],
-                            amount: parseInt(values[3]) || 0,
-                            paymentMethod: values[4],
-                            notes: values[5] || '',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        };
-
-                        await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
-                        successCount++;
-                        
-                    } else if (type === 'fixedExpenses') {
-                        // 카테고리,고정비내역,월금액,결제방식,시작일,비고
-                        if (values.length < 5) continue;
-                        
-                        const fixedExpense = {
-                            category: values[0],
-                            description: values[1],
-                            amount: parseInt(values[2]) || 0,
-                            paymentMethod: values[3],
-                            startDate: values[4],
-                            notes: values[5] || '',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        };
-
-                        await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
-                        successCount++;
-                    }
-                    
-                } catch (error) {
-                    console.error('데이터 추가 오류:', error);
-                    errorCount++;
+            try {
+                // 다양한 인코딩으로 파일 읽기 시도
+                let text = await readFileWithEncoding(file);
+                
+                const lines = text.split(/\r?\n/).filter(line => line.trim());
+                
+                if (lines.length < 2) {
+                    alert('CSV 파일이 비어있거나 헤더만 있습니다.');
+                    return;
                 }
-            }
 
-            alert(`데이터 가져오기 완료!\n성공: ${successCount}건\n실패: ${errorCount}건`);
+                // 헤더 제거
+                const dataLines = lines.slice(1);
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const line of dataLines) {
+                    try {
+                        // CSV 파싱 개선 (따옴표 처리 포함)
+                        const values = parseCSVLine(line);
+                        
+                        if (type === 'expenses') {
+                            // 날짜,카테고리,지출내역,금액,결제방식,비고
+                            if (values.length < 5) continue;
+                            
+                            const expense = {
+                                date: values[0].trim(),
+                                category: values[1].trim(),
+                                description: values[2].trim(),
+                                amount: parseInt(values[3].replace(/[^0-9]/g, '')) || 0,
+                                paymentMethod: values[4].trim(),
+                                notes: (values[5] || '').trim(),
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            };
+
+                            // 필수 필드 검증
+                            if (expense.date && expense.category && expense.description && expense.amount > 0) {
+                                await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
+                                successCount++;
+                            } else {
+                                errorCount++;
+                            }
+                            
+                        } else if (type === 'fixedExpenses') {
+                            // 카테고리,고정비내역,월금액,결제방식,시작일,비고
+                            if (values.length < 5) continue;
+                            
+                            const fixedExpense = {
+                                category: values[0].trim(),
+                                description: values[1].trim(),
+                                amount: parseInt(values[2].replace(/[^0-9]/g, '')) || 0,
+                                paymentMethod: values[3].trim(),
+                                startDate: values[4].trim(),
+                                notes: (values[5] || '').trim(),
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            };
+
+                            // 필수 필드 검증
+                            if (fixedExpense.category && fixedExpense.description && fixedExpense.amount > 0) {
+                                await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
+                                successCount++;
+                            } else {
+                                errorCount++;
+                            }
+                        }
+                        
+                    } catch (error) {
+                        console.error('데이터 행 처리 오류:', error, 'Line:', line);
+                        errorCount++;
+                    }
+                }
+
+                alert(`데이터 가져오기 완료!\n성공: ${successCount}건\n실패: ${errorCount}건`);
+                
+            } catch (error) {
+                console.error('파일 읽기 오류:', error);
+                alert('파일을 읽는 중 오류가 발생했습니다. UTF-8 인코딩으로 저장된 CSV 파일을 사용해주세요.');
+            }
             
             // 파일 input 초기화
             event.target.value = '';
+        }
+
+        // 다양한 인코딩으로 파일 읽기
+        async function readFileWithEncoding(file) {
+            // 먼저 UTF-8로 시도
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(arrayBuffer);
+                
+                // 한글이 제대로 표시되는지 확인 (일반적인 한글 유니코드 범위)
+                if (!/[\uAC00-\uD7A3]/.test(text) && /[가-힣]/.test(file.name)) {
+                    // UTF-8로 읽었는데 한글이 없고 파일명에 한글이 있다면 다른 인코딩 시도
+                    throw new Error('Try other encoding');
+                }
+                
+                return text;
+            } catch (error) {
+                // EUC-KR 시도
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const decoder = new TextDecoder('euc-kr');
+                    return decoder.decode(arrayBuffer);
+                } catch (error2) {
+                    // CP949 시도
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const decoder = new TextDecoder('cp949');
+                        return decoder.decode(arrayBuffer);
+                    } catch (error3) {
+                        // 기본 UTF-8 반환
+                        const arrayBuffer = await file.arrayBuffer();
+                        const decoder = new TextDecoder('utf-8');
+                        return decoder.decode(arrayBuffer);
+                    }
+                }
+            }
+        }
+
+        // CSV 라인 파싱 (따옴표 처리 포함)
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"' && !inQuotes) {
+                    inQuotes = true;
+                } else if (char === '"' && inQuotes && nextChar === '"') {
+                    current += '"';
+                    i++; // 다음 따옴표 건너뛰기
+                } else if (char === '"' && inQuotes) {
+                    inQuotes = false;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            values.push(current); // 마지막 값 추가
+            return values;
         }
 
         // 샘플 CSV 다운로드
