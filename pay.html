@@ -375,7 +375,29 @@
                 </div>
             </div>
 
-            <!-- 새 지출 등록 폼 -->
+            <!-- 데이터 가져오기 섹션 -->
+            <div class="form-section">
+                <h3>데이터 가져오기</h3>
+                <p>CSV 파일을 업로드하여 기존 데이터를 가져올 수 있습니다.</p>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="csvFile">지출 내역 CSV 파일</label>
+                        <input type="file" id="csvFile" accept=".csv" onchange="handleCsvUpload(event, 'expenses')">
+                        <small>CSV 형식: 날짜,카테고리,지출내역,금액,결제방식,비고</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="fixedCsvFile">고정비 CSV 파일</label>
+                        <input type="file" id="fixedCsvFile" accept=".csv" onchange="handleCsvUpload(event, 'fixedExpenses')">
+                        <small>CSV 형식: 카테고리,고정비내역,월금액,결제방식,시작일,비고</small>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="button" class="btn" onclick="downloadSampleCsv('expenses')">지출 내역 샘플 CSV 다운로드</button>
+                    <button type="button" class="btn" onclick="downloadSampleCsv('fixedExpenses')">고정비 샘플 CSV 다운로드</button>
+                </div>
+            </div>
             <div class="form-section">
                 <h3>새 지출 등록</h3>
                 <form id="expenseForm">
@@ -569,12 +591,108 @@
         let expenseUnsubscribe = null;
         let fixedExpenseUnsubscribe = null;
 
-        // DOM 요소들을 전역으로 설정
-        window.signInWithGoogle = signInWithGoogle;
-        window.signOut = signOut;
-        window.deleteExpenseById = deleteExpenseById;
-        window.deleteFixedExpenseById = deleteFixedExpenseById;
-        window.generateMonthlyExpenses = generateMonthlyExpenses;
+        // CSV 파일 업로드 처리
+        window.handleCsvUpload = handleCsvUpload;
+        window.downloadSampleCsv = downloadSampleCsv;
+
+        async function handleCsvUpload(event, type) {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            if (lines.length < 2) {
+                alert('CSV 파일이 비어있거나 헤더만 있습니다.');
+                return;
+            }
+
+            // 헤더 제거
+            const dataLines = lines.slice(1);
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const line of dataLines) {
+                try {
+                    const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+                    
+                    if (type === 'expenses') {
+                        // 날짜,카테고리,지출내역,금액,결제방식,비고
+                        if (values.length < 5) continue;
+                        
+                        const expense = {
+                            date: values[0],
+                            category: values[1],
+                            description: values[2],
+                            amount: parseInt(values[3]) || 0,
+                            paymentMethod: values[4],
+                            notes: values[5] || '',
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
+                        successCount++;
+                        
+                    } else if (type === 'fixedExpenses') {
+                        // 카테고리,고정비내역,월금액,결제방식,시작일,비고
+                        if (values.length < 5) continue;
+                        
+                        const fixedExpense = {
+                            category: values[0],
+                            description: values[1],
+                            amount: parseInt(values[2]) || 0,
+                            paymentMethod: values[3],
+                            startDate: values[4],
+                            notes: values[5] || '',
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        await addDoc(collection(db, `users/${currentUser.uid}/fixedExpenses`), fixedExpense);
+                        successCount++;
+                    }
+                    
+                } catch (error) {
+                    console.error('데이터 추가 오류:', error);
+                    errorCount++;
+                }
+            }
+
+            alert(`데이터 가져오기 완료!\n성공: ${successCount}건\n실패: ${errorCount}건`);
+            
+            // 파일 input 초기화
+            event.target.value = '';
+        }
+
+        // 샘플 CSV 다운로드
+        function downloadSampleCsv(type) {
+            let csvContent = '';
+            let filename = '';
+
+            if (type === 'expenses') {
+                csvContent = '날짜,카테고리,지출내역,금액,결제방식,비고\n';
+                csvContent += '2024-01-15,사무용품,A4 용지 구매,5000,법인카드,복사용지\n';
+                csvContent += '2024-01-16,식비,점심 식사,12000,현금,팀 회식\n';
+                filename = 'expenses_sample.csv';
+            } else {
+                csvContent = '카테고리,고정비내역,월금액,결제방식,시작일,비고\n';
+                csvContent += '임대료,사무실 임대료,500000,자동이체,2024-01-01,월세\n';
+                csvContent += '통신비,인터넷 요금,55000,자동이체,2024-01-01,광랜\n';
+                filename = 'fixed_expenses_sample.csv';
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
 
         // 인증 상태 변경 감지
         onAuthStateChanged(auth, (user) => {
