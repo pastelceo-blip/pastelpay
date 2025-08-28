@@ -591,7 +591,12 @@
         let expenseUnsubscribe = null;
         let fixedExpenseUnsubscribe = null;
 
-        // CSV 파일 업로드 처리
+        // DOM 요소들을 전역으로 설정
+        window.signInWithGoogle = signInWithGoogle;
+        window.signOut = signOut;
+        window.deleteExpenseById = deleteExpenseById;
+        window.deleteFixedExpenseById = deleteFixedExpenseById;
+        window.generateMonthlyExpenses = generateMonthlyExpenses;
         window.handleCsvUpload = handleCsvUpload;
         window.downloadSampleCsv = downloadSampleCsv;
 
@@ -982,8 +987,15 @@
 
         // 지출 삭제
         async function deleteExpenseById(expenseId) {
+            console.log('삭제 함수 호출:', expenseId);
+            
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            if (!expenseId) {
+                alert('잘못된 ID입니다.');
                 return;
             }
             
@@ -1001,8 +1013,15 @@
 
         // 고정비 삭제
         async function deleteFixedExpenseById(fixedId) {
+            console.log('고정비 삭제 함수 호출:', fixedId);
+            
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            if (!fixedId) {
+                alert('잘못된 ID입니다.');
                 return;
             }
             
