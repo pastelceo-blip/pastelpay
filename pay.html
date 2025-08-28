@@ -320,6 +320,79 @@
             color: #e74c3c;
             font-size: 1.1em;
         }
+
+        .canvas-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 450px;
+            padding: 20px;
+        }
+
+        .canvas-wrapper canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .editable-row {
+            cursor: pointer;
+        }
+
+        .editable-row:hover {
+            background: #e8f4f8 !important;
+        }
+
+        .edit-input {
+            width: 100%;
+            padding: 4px 8px;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            font-size: 0.9em;
+            background: white;
+        }
+
+        .edit-select {
+            width: 100%;
+            padding: 4px 8px;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            font-size: 0.9em;
+            background: white;
+        }
+
+        .toggle-section {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .toggle-section:hover {
+            color: #2980b9;
+        }
+
+        .toggle-icon {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
         
         @media (max-width: 768px) {
             .container {
@@ -445,8 +518,8 @@
                         <h4>이번 달 카테고리별 지출</h4>
                         <span id="thisMonthTotal" class="chart-total">총 지출: ₩0</span>
                     </div>
-                    <div style="text-align: center; padding: 40px;">
-                        <canvas id="thisMonthCanvas" width="400" height="400"></canvas>
+                    <div class="canvas-wrapper">
+                        <canvas id="thisMonthCanvas" width="450" height="450"></canvas>
                     </div>
                 </div>
                 
@@ -456,8 +529,8 @@
                         <h4>이번 달 일반 지출 (고정비 제외)</h4>
                         <span id="nonFixedTotal" class="chart-total">일반 지출: ₩0</span>
                     </div>
-                    <div style="text-align: center; padding: 40px;">
-                        <canvas id="nonFixedCanvas" width="400" height="400"></canvas>
+                    <div class="canvas-wrapper">
+                        <canvas id="nonFixedCanvas" width="450" height="450"></canvas>
                     </div>
                 </div>
                 
@@ -470,8 +543,8 @@
                             <span id="thisMonthTotalComp" class="chart-total">이번 달: ₩0</span>
                         </div>
                     </div>
-                    <div style="text-align: center; padding: 40px;">
-                        <canvas id="comparisonCanvas" width="800" height="400"></canvas>
+                    <div class="canvas-wrapper">
+                        <canvas id="comparisonCanvas" width="850" height="450"></canvas>
                     </div>
                 </div>
             </div>
@@ -594,23 +667,28 @@
             
             <!-- 등록된 고정비 목록 -->
             <div class="form-section">
-                <h3>등록된 고정비</h3>
-                <div style="overflow-x: auto;">
-                    <table class="expense-table">
-                        <thead>
-                            <tr>
-                                <th>카테고리</th>
-                                <th>고정비 내역</th>
-                                <th>월 금액</th>
-                                <th>결제 방식</th>
-                                <th>시작일</th>
-                                <th>비고</th>
-                                <th>관리</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fixedExpenseTableBody">
-                        </tbody>
-                    </table>
+                <div class="toggle-section" onclick="toggleFixedExpenseList()">
+                    <h3 style="margin: 0;">등록된 고정비</h3>
+                    <span class="toggle-icon" id="fixedExpenseToggle">▼</span>
+                </div>
+                <div class="collapsible-content" id="fixedExpenseContent">
+                    <div style="overflow-x: auto; margin-top: 20px;">
+                        <table class="expense-table">
+                            <thead>
+                                <tr>
+                                    <th>카테고리</th>
+                                    <th>고정비 내역</th>
+                                    <th>월 금액</th>
+                                    <th>결제 방식</th>
+                                    <th>시작일</th>
+                                    <th>비고</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fixedExpenseTableBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             
@@ -642,7 +720,7 @@
     <script type="module">
         // Firebase 설정 및 초기화
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
         // Firebase 설정
@@ -669,6 +747,8 @@
         let currentUser = null;
         let expenseUnsubscribe = null;
         let fixedExpenseUnsubscribe = null;
+        let editingExpenseId = null;
+        let editingFixedId = null;
 
         // 함수들을 전역으로 노출
         window.signInWithGoogle = signInWithGoogle;
@@ -677,6 +757,13 @@
         window.deleteFixedExpenseById = deleteFixedExpenseById;
         window.generateMonthlyExpenses = generateMonthlyExpenses;
         window.showChart = showChart;
+        window.toggleFixedExpenseList = toggleFixedExpenseList;
+        window.editExpense = editExpense;
+        window.saveExpenseEdit = saveExpenseEdit;
+        window.cancelExpenseEdit = cancelExpenseEdit;
+        window.editFixedExpense = editFixedExpense;
+        window.saveFixedExpenseEdit = saveFixedExpenseEdit;
+        window.cancelFixedExpenseEdit = cancelFixedExpenseEdit;
 
         // 인증 상태 변경 감지
         onAuthStateChanged(auth, (user) => {
@@ -716,7 +803,6 @@
                     const signOutBtn = document.getElementById('signOutBtn');
                     
                     if (googleSignInBtn) {
-                        console.log('로그인 버튼 이벤트 연결');
                         googleSignInBtn.addEventListener('click', signInWithGoogle);
                     }
                     
@@ -902,8 +988,6 @@
 
         // 지출 삭제
         async function deleteExpenseById(expenseId) {
-            console.log('삭제 함수 호출:', expenseId);
-            
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
                 return;
@@ -928,8 +1012,6 @@
 
         // 고정비 삭제
         async function deleteFixedExpenseById(fixedId) {
-            console.log('고정비 삭제 함수 호출:', fixedId);
-            
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
                 return;
@@ -968,6 +1050,7 @@
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             
+            // 이번 달에 이미 생성된 고정비들을 체크
             const existingThisMonth = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
                 return expenseDate.getMonth() === thisMonth && 
@@ -975,18 +1058,28 @@
                        expense.notes && expense.notes.includes('[고정비 자동생성]');
             });
             
-            if (existingThisMonth.length > 0) {
-                if (!confirm(`이번 달에 이미 ${existingThisMonth.length}개의 고정비가 생성되어 있습니다.\n다시 생성하시겠습니까?`)) {
-                    return;
-                }
-            }
+            // 각 고정비별로 중복 체크를 위한 매핑 생성
+            const existingFixedExpensesByDescription = new Set(
+                existingThisMonth.map(expense => `${expense.category}-${expense.description}-${expense.amount}`)
+            );
             
             let addedCount = 0;
+            let skippedCount = 0;
             
             for (const fixed of fixedExpenses) {
                 const fixedStartDate = new Date(fixed.startDate);
                 
                 if (fixedStartDate <= now) {
+                    // 중복 체크용 키 생성
+                    const duplicateCheckKey = `${fixed.category}-${fixed.description}-${fixed.amount}`;
+                    
+                    // 이미 존재하는지 확인
+                    if (existingFixedExpensesByDescription.has(duplicateCheckKey)) {
+                        skippedCount++;
+                        console.log('중복된 고정비 건너뛰기:', fixed.description);
+                        continue;
+                    }
+                    
                     const expense = {
                         date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0],
                         category: fixed.category,
@@ -1001,6 +1094,9 @@
                     try {
                         await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
                         addedCount++;
+                        // 추가 후 중복 체크 목록에 추가
+                        existingFixedExpensesByDescription.add(duplicateCheckKey);
+                        console.log('고정비 추가:', fixed.description);
                     } catch (error) {
                         console.error('고정비 생성 오류:', error);
                         alert('고정비 생성 중 오류가 발생했습니다: ' + error.message);
@@ -1009,12 +1105,187 @@
                 }
             }
             
+            // 결과 메시지 표시
+            let resultMessage = '';
             if (addedCount > 0) {
-                showSuccessMessage(`${addedCount}개의 고정비가 이번 달 지출로 추가되었습니다.`);
-                console.log('고정비 생성 완료:', addedCount, '개');
+                resultMessage += `${addedCount}개의 고정비가 이번 달 지출로 추가되었습니다.`;
+            }
+            if (skippedCount > 0) {
+                if (resultMessage) resultMessage += '\n';
+                resultMessage += `${skippedCount}개의 고정비는 이미 존재하여 건너뛰었습니다.`;
+            }
+            
+            if (addedCount > 0) {
+                showSuccessMessage(resultMessage);
+                console.log('고정비 생성 완료 - 추가:', addedCount, '개, 건너뜀:', skippedCount, '개');
+            } else if (skippedCount > 0) {
+                alert('모든 고정비가 이미 이번 달에 생성되어 있습니다.');
             } else {
                 alert('추가할 고정비가 없습니다.');
             }
+        }
+
+        // 고정비 목록 토글
+        function toggleFixedExpenseList() {
+            const content = document.getElementById('fixedExpenseContent');
+            const toggle = document.getElementById('fixedExpenseToggle');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.textContent = '▼';
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.textContent = '▶';
+            }
+        }
+
+        // 지출 수정 시작
+        function editExpense(expenseId) {
+            if (editingExpenseId) {
+                cancelExpenseEdit();
+            }
+            editingExpenseId = expenseId;
+            
+            const expense = expenses.find(e => e.id === expenseId);
+            if (!expense) return;
+            
+            const row = document.querySelector(`[data-expense-id="${expenseId}"]`).closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            cells[0].innerHTML = `<input type="date" class="edit-input" value="${expense.date}" id="edit-date">`;
+            cells[1].innerHTML = `
+                <select class="edit-select" id="edit-category">
+                    <option value="사무용품" ${expense.category === '사무용품' ? 'selected' : ''}>사무용품</option>
+                    <option value="청첩장" ${expense.category === '청첩장' ? 'selected' : ''}>청첩장</option>
+                    <option value="식비" ${expense.category === '식비' ? 'selected' : ''}>식비</option>
+                    <option value="알바비" ${expense.category === '알바비' ? 'selected' : ''}>알바비</option>
+                    <option value="액자" ${expense.category === '액자' ? 'selected' : ''}>액자</option>
+                    <option value="광고비" ${expense.category === '광고비' ? 'selected' : ''}>광고비</option>
+                    <option value="마케팅" ${expense.category === '마케팅' ? 'selected' : ''}>마케팅</option>
+                    <option value="택배비" ${expense.category === '택배비' ? 'selected' : ''}>택배비</option>
+                    <option value="이벤트" ${expense.category === '이벤트' ? 'selected' : ''}>이벤트</option>
+                    <option value="통신비" ${expense.category === '통신비' ? 'selected' : ''}>통신비</option>
+                    <option value="임대료" ${expense.category === '임대료' ? 'selected' : ''}>임대료</option>
+                    <option value="기타" ${expense.category === '기타' ? 'selected' : ''}>기타</option>
+                </select>
+            `;
+            cells[2].innerHTML = `<input type="text" class="edit-input" value="${expense.description}" id="edit-description">`;
+            cells[3].innerHTML = `<input type="number" class="edit-input" value="${expense.amount}" id="edit-amount">`;
+            cells[4].innerHTML = `
+                <select class="edit-select" id="edit-paymentMethod">
+                    <option value="법인카드" ${expense.paymentMethod === '법인카드' ? 'selected' : ''}>법인카드</option>
+                    <option value="현금" ${expense.paymentMethod === '현금' ? 'selected' : ''}>현금</option>
+                    <option value="계좌이체" ${expense.paymentMethod === '계좌이체' ? 'selected' : ''}>계좌이체</option>
+                    <option value="개인카드(정산)" ${expense.paymentMethod === '개인카드(정산)' ? 'selected' : ''}>개인카드(정산)</option>
+                </select>
+            `;
+            cells[5].innerHTML = `<input type="text" class="edit-input" value="${expense.notes}" id="edit-notes">`;
+            cells[6].innerHTML = `
+                <button class="btn" style="margin-right: 5px; padding: 5px 10px; font-size: 0.8em;" onclick="saveExpenseEdit('${expenseId}')">저장</button>
+                <button class="btn-danger" style="padding: 5px 10px; font-size: 0.8em;" onclick="cancelExpenseEdit()">취소</button>
+            `;
+        }
+
+        // 지출 수정 저장
+        async function saveExpenseEdit(expenseId) {
+            const updatedExpense = {
+                date: document.getElementById('edit-date').value,
+                category: document.getElementById('edit-category').value,
+                description: document.getElementById('edit-description').value,
+                amount: parseInt(document.getElementById('edit-amount').value),
+                paymentMethod: document.getElementById('edit-paymentMethod').value,
+                notes: document.getElementById('edit-notes').value,
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                await updateDoc(doc(db, `users/${currentUser.uid}/expenses`, expenseId), updatedExpense);
+                editingExpenseId = null;
+                showSuccessMessage('지출이 수정되었습니다.');
+                console.log('지출 수정 완료:', expenseId);
+            } catch (error) {
+                console.error('지출 수정 오류:', error);
+                alert('지출 수정 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 지출 수정 취소
+        function cancelExpenseEdit() {
+            editingExpenseId = null;
+            renderExpenseTable();
+        }
+
+        // 고정비 수정 시작
+        function editFixedExpense(fixedId) {
+            if (editingFixedId) {
+                cancelFixedExpenseEdit();
+            }
+            editingFixedId = fixedId;
+            
+            const fixed = fixedExpenses.find(f => f.id === fixedId);
+            if (!fixed) return;
+            
+            const row = document.querySelector(`[data-fixed-id="${fixedId}"]`).closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            cells[0].innerHTML = `
+                <select class="edit-select" id="edit-fixed-category">
+                    <option value="임대료" ${fixed.category === '임대료' ? 'selected' : ''}>임대료</option>
+                    <option value="통신비" ${fixed.category === '통신비' ? 'selected' : ''}>통신비</option>
+                    <option value="세금" ${fixed.category === '세금' ? 'selected' : ''}>세금</option>
+                    <option value="구독료" ${fixed.category === '구독료' ? 'selected' : ''}>구독료</option>
+                    <option value="유지보수비" ${fixed.category === '유지보수비' ? 'selected' : ''}>유지보수비</option>
+                    <option value="급여" ${fixed.category === '급여' ? 'selected' : ''}>급여</option>
+                    <option value="기타 고정비" ${fixed.category === '기타 고정비' ? 'selected' : ''}>기타 고정비</option>
+                </select>
+            `;
+            cells[1].innerHTML = `<input type="text" class="edit-input" value="${fixed.description}" id="edit-fixed-description">`;
+            cells[2].innerHTML = `<input type="number" class="edit-input" value="${fixed.amount}" id="edit-fixed-amount">`;
+            cells[3].innerHTML = `
+                <select class="edit-select" id="edit-fixed-paymentMethod">
+                    <option value="자동이체" ${fixed.paymentMethod === '자동이체' ? 'selected' : ''}>자동이체</option>
+                    <option value="법인카드" ${fixed.paymentMethod === '법인카드' ? 'selected' : ''}>법인카드</option>
+                    <option value="계좌이체" ${fixed.paymentMethod === '계좌이체' ? 'selected' : ''}>계좌이체</option>
+                    <option value="현금" ${fixed.paymentMethod === '현금' ? 'selected' : ''}>현금</option>
+                </select>
+            `;
+            cells[4].innerHTML = `<input type="date" class="edit-input" value="${fixed.startDate}" id="edit-fixed-startDate">`;
+            cells[5].innerHTML = `<input type="text" class="edit-input" value="${fixed.notes}" id="edit-fixed-notes">`;
+            cells[6].innerHTML = `
+                <button class="btn" style="margin-right: 5px; padding: 5px 10px; font-size: 0.8em;" onclick="saveFixedExpenseEdit('${fixedId}')">저장</button>
+                <button class="btn-danger" style="padding: 5px 10px; font-size: 0.8em;" onclick="cancelFixedExpenseEdit()">취소</button>
+            `;
+        }
+
+        // 고정비 수정 저장
+        async function saveFixedExpenseEdit(fixedId) {
+            const updatedFixed = {
+                category: document.getElementById('edit-fixed-category').value,
+                description: document.getElementById('edit-fixed-description').value,
+                amount: parseInt(document.getElementById('edit-fixed-amount').value),
+                paymentMethod: document.getElementById('edit-fixed-paymentMethod').value,
+                startDate: document.getElementById('edit-fixed-startDate').value,
+                notes: document.getElementById('edit-fixed-notes').value,
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                await updateDoc(doc(db, `users/${currentUser.uid}/fixedExpenses`, fixedId), updatedFixed);
+                editingFixedId = null;
+                showSuccessMessage('고정비가 수정되었습니다.');
+                console.log('고정비 수정 완료:', fixedId);
+            } catch (error) {
+                console.error('고정비 수정 오류:', error);
+                alert('고정비 수정 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 고정비 수정 취소
+        function cancelFixedExpenseEdit() {
+            editingFixedId = null;
+            renderFixedExpenseTable();
         }
 
         // 테이블 렌더링
@@ -1023,7 +1294,7 @@
             
             tbody.innerHTML = expenses.map((expense) => {
                 return `
-                    <tr>
+                    <tr class="editable-row" ondblclick="editExpense('${expense.id}')" title="더블클릭하여 수정">
                         <td>${new Date(expense.date).toLocaleDateString('ko-KR')}</td>
                         <td><span style="padding: 4px 8px; background: #e3f2fd; border-radius: 4px; font-size: 0.8em;">${expense.category}</span></td>
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${expense.description}</td>
@@ -1039,6 +1310,7 @@
             
             tbody.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const expenseId = e.target.getAttribute('data-expense-id');
                     deleteExpenseById(expenseId);
                 });
@@ -1050,7 +1322,7 @@
             
             tbody.innerHTML = fixedExpenses.map((fixed) => {
                 return `
-                    <tr>
+                    <tr class="editable-row" ondblclick="editFixedExpense('${fixed.id}')" title="더블클릭하여 수정">
                         <td><span style="padding: 4px 8px; background: #fff3cd; border-radius: 4px; font-size: 0.8em;">${fixed.category}</span></td>
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${fixed.description}</td>
                         <td style="text-align: right; font-weight: bold; color: #f39c12;">₩${fixed.amount.toLocaleString()}</td>
@@ -1066,6 +1338,7 @@
             
             tbody.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const fixedId = e.target.getAttribute('data-fixed-id');
                     deleteFixedExpenseById(fixedId);
                 });
@@ -1310,7 +1583,7 @@
             const ctx = canvas.getContext('2d');
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const radius = Math.min(centerX, centerY) - 20;
+            const radius = Math.min(centerX, centerY) - 100;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1342,7 +1615,7 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                if (sliceAngle > 0.1) {
+                if (sliceAngle > 0.15) {
                     const labelAngle = currentAngle + sliceAngle / 2;
                     const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
                     const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
@@ -1360,25 +1633,43 @@
             drawLegend(ctx, canvas, categories, colors, data, total);
         }
 
-        // 범례 그리기
+        // 범례 그리기 (개선된 버전)
         function drawLegend(ctx, canvas, categories, colors, data, total) {
-            const legendX = canvas.width - 150;
-            let legendY = 20;
+            const legendStartX = canvas.width - 180;
+            const legendWidth = 160;
+            let legendY = 30;
             
-            ctx.font = '12px Malgun Gothic';
+            // 범례 배경 그리기
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.fillRect(legendStartX - 10, legendY - 15, legendWidth, categories.length * 40 + 20);
+            ctx.strokeStyle = '#e9ecef';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(legendStartX - 10, legendY - 15, legendWidth, categories.length * 40 + 20);
+            
+            ctx.font = '11px Malgun Gothic';
             ctx.textAlign = 'left';
             
             categories.forEach((category, index) => {
+                // 색상 박스
                 ctx.fillStyle = colors[index % colors.length];
-                ctx.fillRect(legendX, legendY, 15, 15);
+                ctx.fillRect(legendStartX, legendY, 12, 12);
                 
+                // 텍스트
                 ctx.fillStyle = '#2c3e50';
                 const amount = data[category];
                 const percentage = ((amount / total) * 100).toFixed(1);
-                ctx.fillText(`${category}`, legendX + 20, legendY + 12);
-                ctx.fillText(`₩${amount.toLocaleString()} (${percentage}%)`, legendX + 20, legendY + 24);
                 
-                legendY += 35;
+                // 카테고리명 (길면 잘라내기)
+                const categoryText = category.length > 8 ? category.substring(0, 8) + '...' : category;
+                ctx.fillText(categoryText, legendStartX + 18, legendY + 10);
+                
+                // 금액과 퍼센트
+                ctx.font = '10px Malgun Gothic';
+                ctx.fillText(`₩${amount.toLocaleString()}`, legendStartX + 18, legendY + 22);
+                ctx.fillText(`(${percentage}%)`, legendStartX + 18, legendY + 32);
+                
+                ctx.font = '11px Malgun Gothic';
+                legendY += 40;
             });
         }
 
@@ -1408,7 +1699,7 @@
 
             const chartHeight = canvas.height - 80;
             const chartTop = 40;
-            const groupSpacing = Math.min(60, (canvas.width - 100) / allCategories.length);
+            const groupSpacing = Math.min(80, (canvas.width - 100) / allCategories.length);
 
             allCategories.forEach((category, index) => {
                 const x = 50 + index * groupSpacing;
@@ -1426,9 +1717,11 @@
                 ctx.fillStyle = '#2c3e50';
                 ctx.font = '10px Malgun Gothic';
                 ctx.textAlign = 'center';
-                ctx.fillText(category.substring(0, 6), x + barWidth, canvas.height - 10);
+                const categoryText = category.length > 6 ? category.substring(0, 6) + '...' : category;
+                ctx.fillText(categoryText, x + barWidth, canvas.height - 10);
             });
 
+            // 범례
             ctx.fillStyle = '#95a5a6';
             ctx.fillRect(canvas.width - 150, 10, 20, 15);
             ctx.fillStyle = '#2c3e50';
