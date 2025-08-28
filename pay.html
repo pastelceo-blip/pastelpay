@@ -585,8 +585,29 @@
             testConnection();
         }
 
-        // 연결 테스트
-        async function testConnection() {
+        // JSONP 요청 함수
+        function makeJsonpRequest(url, callback) {
+            const callbackName = 'jsonpCallback_' + Math.random().toString(36).substr(2, 9);
+            
+            window[callbackName] = function(data) {
+                callback(data);
+                document.head.removeChild(script);
+                delete window[callbackName];
+            };
+            
+            const script = document.createElement('script');
+            script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + callbackName;
+            script.onerror = function() {
+                callback({ success: false, message: '요청 실패' });
+                document.head.removeChild(script);
+                delete window[callbackName];
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // 연결 테스트 (JSONP 사용)
+        function testConnection() {
             if (!apiUrl) {
                 updateConnectionStatus('disconnected', '연결 안됨');
                 return;
@@ -594,10 +615,7 @@
 
             updateConnectionStatus('connecting', '연결 확인 중...');
             
-            try {
-                const response = await fetch(apiUrl + '?action=getExpenses');
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?action=getExpenses', function(result) {
                 if (result.success !== undefined) {
                     updateConnectionStatus('connected', '연결됨');
                     document.getElementById('configSection').style.display = 'none';
@@ -608,12 +626,7 @@
                     document.getElementById('configSection').style.display = 'block';
                     document.getElementById('mainContent').classList.remove('show');
                 }
-            } catch (error) {
-                updateConnectionStatus('disconnected', '연결 실패');
-                document.getElementById('configSection').style.display = 'block';
-                document.getElementById('mainContent').classList.remove('show');
-                console.error('Connection test failed:', error);
-            }
+            });
         }
 
         // 연결 상태 업데이트
