@@ -1687,7 +1687,7 @@
                 // 금액과 퍼센트
                 const amount = data[category];
                 const percentage = ((amount / total) * 100).toFixed(1);
-                const amountText = amount >= 1000 ? `₩${Math.round(amount/1000)}K` : `₩${amount.toLocaleString()}`;
+                const amountText = `₩${amount.toLocaleString()}`; // 전체 원화 금액 표시
                 
                 ctx.fillStyle = '#6c757d';
                 ctx.font = '10px Malgun Gothic';
@@ -1760,10 +1760,12 @@
                 ctx.font = '9px Malgun Gothic';
                 ctx.fillStyle = '#666';
                 if (lastAmount > 0) {
-                    ctx.fillText(`₩${(lastAmount/1000).toFixed(0)}K`, x + barWidth/2, chartTop + chartHeight - lastBarHeight - 5);
+                    const lastAmountText = lastAmount >= 1000000 ? `₩${(lastAmount/1000000).toFixed(1)}M` : `₩${Math.round(lastAmount/1000)}K`;
+                    ctx.fillText(lastAmountText, x + barWidth/2, chartTop + chartHeight - lastBarHeight - 5);
                 }
                 if (thisAmount > 0) {
-                    ctx.fillText(`₩${(thisAmount/1000).toFixed(0)}K`, x + barWidth + 8 + barWidth/2, chartTop + chartHeight - thisBarHeight - 5);
+                    const thisAmountText = thisAmount >= 1000000 ? `₩${(thisAmount/1000000).toFixed(1)}M` : `₩${Math.round(thisAmount/1000)}K`;
+                    ctx.fillText(thisAmountText, x + barWidth + 8 + barWidth/2, chartTop + chartHeight - thisBarHeight - 5);
                 }
             });
 
