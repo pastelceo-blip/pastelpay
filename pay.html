@@ -270,6 +270,57 @@
             color: #721c24;
         }
         
+        .chart-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            color: #7f8c8d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+        
+        .tab-btn:hover {
+            color: #2980b9;
+            background: #f8f9fa;
+        }
+        
+        .chart-container {
+            margin-top: 20px;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        
+        .chart-header h4 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .chart-total {
+            font-weight: bold;
+            color: #e74c3c;
+            font-size: 1.1em;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 5px;
@@ -597,6 +648,7 @@
         window.deleteExpenseById = deleteExpenseById;
         window.deleteFixedExpenseById = deleteFixedExpenseById;
         window.generateMonthlyExpenses = generateMonthlyExpenses;
+        window.showChart = showChart;
 
         // DOM 요소들을 전역으로 설정
         window.signInWithGoogle = signInWithGoogle;
@@ -1290,6 +1342,321 @@
             document.getElementById('monthlyExpense').textContent = `₩${thisMonth.toLocaleString()}`;
             document.getElementById('totalItems').textContent = `${expenses.length}건`;
             document.getElementById('averageExpense').textContent = `₩${monthlyFixedTotal.toLocaleString()}`;
+            
+            // 차트 업데이트
+            updateCharts();
+        }
+
+        // 차트 탭 전환
+        function showChart(type) {
+            // 탭 버튼 활성화 상태 변경
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 차트 컨테이너 표시/숨김
+            if (type === 'thisMonth') {
+                document.getElementById('thisMonthChart').style.display = 'block';
+                document.getElementById('comparisonChart').style.display = 'none';
+            } else {
+                document.getElementById('thisMonthChart').style.display = 'none';
+                document.getElementById('comparisonChart').style.display = 'block';
+            }
+            
+            updateCharts();
+        }
+
+        // 차트 업데이트
+        function updateCharts() {
+            drawThisMonthChart();
+            drawComparisonChart();
+        }
+
+        // 이번 달 차트 그리기
+        function drawThisMonthChart() {
+            const thisMonthData = getThisMonthData();
+            const categoryData = thisMonthData.categories;
+            const total = thisMonthData.total;
+            const monthInfo = thisMonthData.monthInfo;
+
+            // 총액 업데이트
+            document.getElementById('thisMonthTotal').textContent = 
+                `${monthInfo} 총 지출: ₩${total.toLocaleString()}`;
+
+            // 차트 그리기
+            drawPieChart('thisMonthCanvas', categoryData);
+        }
+
+        // 지난 달 비교 차트 그리기
+        function drawComparisonChart() {
+            const comparisonData = getComparisonData();
+            
+            const thisMonthData = comparisonData.thisMonth.categories;
+            const lastMonthData = comparisonData.lastMonth.categories;
+            const thisMonthTotal = comparisonData.thisMonth.total;
+            const lastMonthTotal = comparisonData.lastMonth.total;
+
+            // 총액 업데이트
+            document.getElementById('thisMonthTotalComp').textContent = 
+                `${comparisonData.thisMonth.monthInfo}: ₩${thisMonthTotal.toLocaleString()}`;
+            document.getElementById('lastMonthTotal').textContent = 
+                `${comparisonData.lastMonth.monthInfo}: ₩${lastMonthTotal.toLocaleString()}`;
+
+            // 비교 차트 그리기
+            drawComparisonBarChart('comparisonCanvas', lastMonthData, thisMonthData);
+        }
+
+        // 이번 달 데이터 가져오기
+        function getThisMonthData() {
+            if (expenses.length === 0) {
+                return {
+                    categories: {},
+                    total: 0,
+                    monthInfo: '이번 달'
+                };
+            }
+
+            const now = new Date();
+            const targetYear = now.getFullYear();
+            const targetMonth = now.getMonth();
+
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === targetMonth && 
+                       expenseDate.getFullYear() === targetYear;
+            });
+
+            const categoryData = {};
+            let total = 0;
+
+            filteredExpenses.forEach(expense => {
+                categoryData[expense.category] = (categoryData[expense.category] || 0) + expense.amount;
+                total += expense.amount;
+            });
+
+            const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+            const monthInfo = `${targetYear}년 ${monthNames[targetMonth]}`;
+
+            return {
+                categories: categoryData,
+                total: total,
+                monthInfo: monthInfo
+            };
+        }
+
+        // 비교 데이터 가져오기
+        function getComparisonData() {
+            if (expenses.length === 0) {
+                return {
+                    thisMonth: { categories: {}, total: 0, monthInfo: '이번 달' },
+                    lastMonth: { categories: {}, total: 0, monthInfo: '지난 달' }
+                };
+            }
+
+            const now = new Date();
+            const thisMonthDate = new Date(now.getFullYear(), now.getMonth());
+            const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
+
+            // 이번 달 데이터
+            const thisMonthExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === thisMonthDate.getMonth() && 
+                       expenseDate.getFullYear() === thisMonthDate.getFullYear();
+            });
+
+            // 지난 달 데이터  
+            const lastMonthExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === lastMonthDate.getMonth() && 
+                       expenseDate.getFullYear() === lastMonthDate.getFullYear();
+            });
+
+            // 카테고리별 집계
+            const thisMonthData = {};
+            const lastMonthData = {};
+            let thisMonthTotal = 0;
+            let lastMonthTotal = 0;
+
+            thisMonthExpenses.forEach(expense => {
+                thisMonthData[expense.category] = (thisMonthData[expense.category] || 0) + expense.amount;
+                thisMonthTotal += expense.amount;
+            });
+
+            lastMonthExpenses.forEach(expense => {
+                lastMonthData[expense.category] = (lastMonthData[expense.category] || 0) + expense.amount;
+                lastMonthTotal += expense.amount;
+            });
+
+            const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+            return {
+                thisMonth: {
+                    categories: thisMonthData,
+                    total: thisMonthTotal,
+                    monthInfo: `${thisMonthDate.getFullYear()}년 ${monthNames[thisMonthDate.getMonth()]}`
+                },
+                lastMonth: {
+                    categories: lastMonthData,
+                    total: lastMonthTotal,
+                    monthInfo: `${lastMonthDate.getFullYear()}년 ${monthNames[lastMonthDate.getMonth()]}`
+                }
+            };
+        }
+
+        // 파이 차트 그리기
+        function drawPieChart(canvasId, data) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 20;
+
+            // 캔버스 초기화
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const categories = Object.keys(data);
+            const total = Object.values(data).reduce((sum, val) => sum + val, 0);
+
+            if (total === 0 || categories.length === 0) {
+                ctx.font = '16px Malgun Gothic';
+                ctx.fillStyle = '#7f8c8d';
+                ctx.textAlign = 'center';
+                ctx.fillText('이번 달 지출 데이터가 없습니다', centerX, centerY - 10);
+                ctx.font = '14px Malgun Gothic';
+                ctx.fillText('새 지출을 등록해보세요', centerX, centerY + 15);
+                return;
+            }
+
+            const colors = getChartColors();
+            let currentAngle = -Math.PI / 2; // 12시 방향부터 시작
+
+            categories.forEach((category, index) => {
+                const sliceAngle = (data[category] / total) * 2 * Math.PI;
+                
+                // 파이 슬라이스 그리기
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 퍼센티지 라벨 (5% 이상인 경우만)
+                if (sliceAngle > 0.1) {
+                    const labelAngle = currentAngle + sliceAngle / 2;
+                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                    const percentage = ((data[category] / total) * 100).toFixed(1);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Malgun Gothic';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${percentage}%`, labelX, labelY);
+                }
+
+                currentAngle += sliceAngle;
+            });
+
+            // 범례 그리기
+            drawLegend(ctx, canvas, categories, colors, data, total);
+        }
+
+        // 범례 그리기
+        function drawLegend(ctx, canvas, categories, colors, data, total) {
+            const legendX = canvas.width - 150;
+            let legendY = 20;
+            
+            ctx.font = '12px Malgun Gothic';
+            ctx.textAlign = 'left';
+            
+            categories.forEach((category, index) => {
+                // 색상 박스
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fillRect(legendX, legendY, 15, 15);
+                
+                // 카테고리명과 금액
+                ctx.fillStyle = '#2c3e50';
+                const amount = data[category];
+                const percentage = ((amount / total) * 100).toFixed(1);
+                ctx.fillText(`${category}`, legendX + 20, legendY + 12);
+                ctx.fillText(`₩${amount.toLocaleString()} (${percentage}%)`, legendX + 20, legendY + 24);
+                
+                legendY += 35;
+            });
+        }
+
+        // 비교 막대 차트 그리기
+        function drawComparisonBarChart(canvasId, lastMonthData, thisMonthData) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 캔버스 초기화
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 모든 카테고리 수집
+            const allCategories = [...new Set([...Object.keys(lastMonthData), ...Object.keys(thisMonthData)])];
+            
+            if (allCategories.length === 0) {
+                ctx.font = '16px Malgun Gothic';
+                ctx.fillStyle = '#7f8c8d';
+                ctx.textAlign = 'center';
+                ctx.fillText('비교할 데이터가 없습니다', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            const barWidth = 30;
+            const maxAmount = Math.max(
+                ...Object.values(lastMonthData),
+                ...Object.values(thisMonthData),
+                1
+            );
+
+            const chartHeight = canvas.height - 80;
+            const chartTop = 40;
+            const groupSpacing = Math.min(60, (canvas.width - 100) / allCategories.length);
+
+            allCategories.forEach((category, index) => {
+                const x = 50 + index * groupSpacing;
+                const lastAmount = lastMonthData[category] || 0;
+                const thisAmount = thisMonthData[category] || 0;
+
+                // 지난 달 막대
+                const lastBarHeight = (lastAmount / maxAmount) * chartHeight;
+                ctx.fillStyle = '#95a5a6';
+                ctx.fillRect(x, chartTop + chartHeight - lastBarHeight, barWidth, lastBarHeight);
+
+                // 이번 달 막대
+                const thisBarHeight = (thisAmount / maxAmount) * chartHeight;
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(x + barWidth + 5, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
+
+                // 카테고리 라벨
+                ctx.fillStyle = '#2c3e50';
+                ctx.font = '10px Malgun Gothic';
+                ctx.textAlign = 'center';
+                ctx.fillText(category.substring(0, 6), x + barWidth, canvas.height - 10);
+            });
+
+            // 범례
+            ctx.fillStyle = '#95a5a6';
+            ctx.fillRect(canvas.width - 150, 10, 20, 15);
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '14px Malgun Gothic';
+            ctx.textAlign = 'left';
+            ctx.fillText('지난 달', canvas.width - 125, 22);
+
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(canvas.width - 150, 30, 20, 15);
+            ctx.fillText('이번 달', canvas.width - 125, 42);
+        }
+
+        // 차트 색상 팔레트
+        function getChartColors() {
+            return [
+                '#3498db', '#e74c3c', '#f39c12', '#2ecc71', '#9b59b6',
+                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#f1c40f'
+            ];
         }
 
         // 성공 메시지 표시
