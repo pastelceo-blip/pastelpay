@@ -978,14 +978,6 @@
             document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
             document.getElementById('signOutBtn')?.addEventListener('click', signOut);
             document.getElementById('generateMonthlyBtn')?.addEventListener('click', generateMonthlyExpenses);
-            document.getElementById('downloadExpenseSample')?.addEventListener('click', () => downloadSampleCsv('expenses'));
-            document.getElementById('downloadFixedSample')?.addEventListener('click', () => downloadSampleCsv('fixedExpenses'));
-            
-            // 파일 업로드 이벤트
-            document.getElementById('csvFile')?.addEventListener('change', (e) => previewCsv(e, 'expenses'));
-            document.getElementById('fixedCsvFile')?.addEventListener('change', (e) => previewCsv(e, 'fixedExpenses'));
-            document.getElementById('uploadCsvBtn')?.addEventListener('click', () => uploadPreviewedCsv('expenses'));
-            document.getElementById('uploadFixedCsvBtn')?.addEventListener('click', () => uploadPreviewedCsv('fixedExpenses'));
         }
 
         // 지출 등록 폼 제출 처리
