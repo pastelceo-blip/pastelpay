@@ -1034,7 +1034,7 @@
             }
         }
 
-        // 이번 달 고정비 생성 (당월 1일로 수정)
+        // 이번 달 고정비 생성 (당월 1일로 확실히 수정)
         async function generateMonthlyExpenses() {
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
@@ -1050,8 +1050,9 @@
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             
-            // 이번 달 1일 날짜 생성
-            const firstDayOfMonth = new Date(thisYear, thisMonth, 1).toISOString().split('T')[0];
+            // 확실히 이번 달 1일로 설정
+            const firstDayOfThisMonth = `${thisYear}-${(thisMonth + 1).toString().padStart(2, '0')}-01`;
+            console.log('생성할 고정비 날짜:', firstDayOfThisMonth);
             
             // 이번 달에 이미 생성된 고정비들을 체크
             const existingThisMonth = expenses.filter(expense => {
@@ -1084,7 +1085,7 @@
                     }
                     
                     const expense = {
-                        date: firstDayOfMonth, // 무조건 이번 달 1일로 설정
+                        date: firstDayOfThisMonth, // YYYY-MM-01 형식으로 확실히 1일 설정
                         category: fixed.category,
                         description: fixed.description,
                         amount: fixed.amount,
@@ -1094,12 +1095,14 @@
                         updatedAt: new Date().toISOString()
                     };
                     
+                    console.log('추가할 고정비 데이터:', expense);
+                    
                     try {
                         await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
                         addedCount++;
                         // 추가 후 중복 체크 목록에 추가
                         existingFixedExpensesByDescription.add(duplicateCheckKey);
-                        console.log('고정비 추가 (1일 등록):', fixed.description, '날짜:', firstDayOfMonth);
+                        console.log('고정비 성공적으로 추가:', fixed.description, '날짜:', firstDayOfThisMonth);
                     } catch (error) {
                         console.error('고정비 생성 오류:', error);
                         alert('고정비 생성 중 오류가 발생했습니다: ' + error.message);
@@ -1111,7 +1114,7 @@
             // 결과 메시지 표시
             let resultMessage = '';
             if (addedCount > 0) {
-                resultMessage += `${addedCount}개의 고정비가 이번 달 1일 지출로 추가되었습니다.`;
+                resultMessage += `${addedCount}개의 고정비가 ${firstDayOfThisMonth} 지출로 추가되었습니다.`;
             }
             if (skippedCount > 0) {
                 if (resultMessage) resultMessage += '\n';
