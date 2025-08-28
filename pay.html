@@ -683,32 +683,22 @@
             }
         }
 
-        // 지출 등록 폼 제출 처리
-        async function handleFormSubmit(e) {
+        // 지출 등록 폼 제출 처리 (JSONP 사용)
+        function handleFormSubmit(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const expenseData = {
+            const params = new URLSearchParams({
                 action: 'addExpense',
                 date: formData.get('date'),
                 category: formData.get('category'),
                 description: formData.get('description'),
-                amount: parseInt(formData.get('amount')),
+                amount: formData.get('amount'),
                 paymentMethod: formData.get('paymentMethod'),
                 notes: formData.get('notes') || ''
-            };
+            });
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(expenseData)
-                });
-
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
                 if (result.success) {
                     // 폼 리셋
                     document.getElementById('expenseForm').reset();
@@ -718,43 +708,30 @@
                     showSuccessMessage(result.message);
                     
                     // 데이터 새로고침
-                    await loadExpenses();
-                    updateSummary();
+                    loadExpenses();
+                    setTimeout(updateSummary, 500);
                 } else {
                     alert('지출 등록 실패: ' + result.message);
                 }
-            } catch (error) {
-                console.error('Error adding expense:', error);
-                alert('지출 등록 중 오류가 발생했습니다.');
-            }
+            });
         }
 
-        // 고정비 등록 폼 제출 처리
-        async function handleFixedExpenseSubmit(e) {
+        // 고정비 등록 폼 제출 처리 (JSONP 사용)
+        function handleFixedExpenseSubmit(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const fixedExpenseData = {
+            const params = new URLSearchParams({
                 action: 'addFixedExpense',
                 category: formData.get('fixedCategory'),
                 description: formData.get('fixedDescription'),
-                amount: parseInt(formData.get('fixedAmount')),
+                amount: formData.get('fixedAmount'),
                 paymentMethod: formData.get('fixedPaymentMethod'),
                 startDate: formData.get('fixedStartDate'),
                 notes: formData.get('fixedNotes') || ''
-            };
+            });
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(fixedExpenseData)
-                });
-
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
                 if (result.success) {
                     // 폼 리셋
                     document.getElementById('fixedExpenseForm').reset();
@@ -764,113 +741,80 @@
                     showSuccessMessage(result.message);
                     
                     // 데이터 새로고침
-                    await loadFixedExpenses();
-                    updateSummary();
+                    loadFixedExpenses();
+                    setTimeout(updateSummary, 500);
                 } else {
                     alert('고정비 등록 실패: ' + result.message);
                 }
-            } catch (error) {
-                console.error('Error adding fixed expense:', error);
-                alert('고정비 등록 중 오류가 발생했습니다.');
-            }
+            });
         }
 
-        // 지출 삭제
-        async function deleteExpenseById(rowIndex) {
+        // 지출 삭제 (JSONP 사용)
+        function deleteExpenseById(rowIndex) {
             if (!confirm('정말 삭제하시겠습니까?')) {
                 return;
             }
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'deleteExpense',
-                        rowIndex: rowIndex
-                    })
-                });
+            const params = new URLSearchParams({
+                action: 'deleteExpense',
+                rowIndex: rowIndex
+            });
 
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
                 if (result.success) {
                     showSuccessMessage(result.message);
-                    await loadExpenses();
-                    updateSummary();
+                    loadExpenses();
+                    setTimeout(updateSummary, 500);
                 } else {
                     alert('삭제 실패: ' + result.message);
                 }
-            } catch (error) {
-                console.error('Error deleting expense:', error);
-                alert('삭제 중 오류가 발생했습니다.');
-            }
+            });
         }
 
-        // 고정비 삭제
-        async function deleteFixedExpenseById(rowIndex) {
+        // 고정비 삭제 (JSONP 사용)
+        function deleteFixedExpenseById(rowIndex) {
             if (!confirm('정말 삭제하시겠습니까?')) {
                 return;
             }
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'deleteFixedExpense',
-                        rowIndex: rowIndex
-                    })
-                });
+            const params = new URLSearchParams({
+                action: 'deleteFixedExpense',
+                rowIndex: rowIndex
+            });
 
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?' + params.toString(), function(result) {
                 if (result.success) {
                     showSuccessMessage(result.message);
-                    await loadFixedExpenses();
-                    updateSummary();
+                    loadFixedExpenses();
+                    setTimeout(updateSummary, 500);
                 } else {
                     alert('삭제 실패: ' + result.message);
                 }
-            } catch (error) {
-                console.error('Error deleting fixed expense:', error);
-                alert('삭제 중 오류가 발생했습니다.');
-            }
+            });
         }
 
-        // 이번 달 고정비 생성
-        async function generateMonthlyExpenses() {
+        // 이번 달 고정비 생성 (JSONP 사용)
+        function generateMonthlyExpenses() {
             if (!confirm('이번 달 고정비를 생성하시겠습니까?')) {
                 return;
             }
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'generateMonthlyExpenses'
-                    })
-                });
-
-                const result = await response.json();
-                
+            makeJsonpRequest(apiUrl + '?action=generateMonthlyExpenses', function(result) {
                 if (result.success) {
                     showSuccessMessage(result.message);
-                    await loadExpenses();
-                    updateSummary();
+                    loadExpenses();
+                    setTimeout(updateSummary, 500);
                 } else {
                     alert(result.message);
                 }
-            } catch (error) {
-                console.error('Error generating monthly expenses:', error);
-                alert('고정비 생성 중 오류가 발생했습니다.');
-            }
+            });
+        }
+
+        // 모든 데이터 로드
+        function loadData() {
+            loadExpenses();
+            loadFixedExpenses();
+            setTimeout(updateSummary, 1000);
         }
 
         // 테이블 렌더링
