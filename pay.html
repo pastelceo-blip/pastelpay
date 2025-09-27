@@ -1211,7 +1211,7 @@
             }
         }
 
-        // 이번 달 고정비 생성 (당월 1일로 확실히 수정)
+        // 이번 달 고정비 생성
         async function generateMonthlyExpenses() {
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
@@ -1227,11 +1227,8 @@
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             
-            // 확실히 이번 달 1일로 설정
             const firstDayOfThisMonth = `${thisYear}-${(thisMonth + 1).toString().padStart(2, '0')}-01`;
-            console.log('생성할 고정비 날짜:', firstDayOfThisMonth);
             
-            // 이번 달에 이미 생성된 고정비들을 체크
             const existingThisMonth = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
                 return expenseDate.getMonth() === thisMonth && 
@@ -1239,7 +1236,6 @@
                        expense.notes && expense.notes.includes('[고정비 자동생성]');
             });
             
-            // 각 고정비별로 중복 체크를 위한 매핑 생성
             const existingFixedExpensesByDescription = new Set(
                 existingThisMonth.map(expense => `${expense.category}-${expense.description}-${expense.amount}`)
             );
@@ -1251,18 +1247,15 @@
                 const fixedStartDate = new Date(fixed.startDate);
                 
                 if (fixedStartDate <= now) {
-                    // 중복 체크용 키 생성
                     const duplicateCheckKey = `${fixed.category}-${fixed.description}-${fixed.amount}`;
                     
-                    // 이미 존재하는지 확인
                     if (existingFixedExpensesByDescription.has(duplicateCheckKey)) {
                         skippedCount++;
-                        console.log('중복된 고정비 건너뛰기:', fixed.description);
                         continue;
                     }
                     
                     const expense = {
-                        date: firstDayOfThisMonth, // YYYY-MM-01 형식으로 확실히 1일 설정
+                        date: firstDayOfThisMonth,
                         category: fixed.category,
                         description: fixed.description,
                         amount: fixed.amount,
@@ -1272,14 +1265,10 @@
                         updatedAt: new Date().toISOString()
                     };
                     
-                    console.log('추가할 고정비 데이터:', expense);
-                    
                     try {
                         await addDoc(collection(db, `users/${currentUser.uid}/expenses`), expense);
                         addedCount++;
-                        // 추가 후 중복 체크 목록에 추가
                         existingFixedExpensesByDescription.add(duplicateCheckKey);
-                        console.log('고정비 성공적으로 추가:', fixed.description, '날짜:', firstDayOfThisMonth);
                     } catch (error) {
                         console.error('고정비 생성 오류:', error);
                         alert('고정비 생성 중 오류가 발생했습니다: ' + error.message);
@@ -1288,7 +1277,6 @@
                 }
             }
             
-            // 결과 메시지 표시
             let resultMessage = '';
             if (addedCount > 0) {
                 resultMessage += `${addedCount}개의 고정비가 ${firstDayOfThisMonth} 지출로 추가되었습니다.`;
@@ -1300,7 +1288,6 @@
             
             if (addedCount > 0) {
                 showSuccessMessage(resultMessage);
-                console.log('고정비 생성 완료 - 추가:', addedCount, '개, 건너뜀:', skippedCount, '개');
             } else if (skippedCount > 0) {
                 alert('모든 고정비가 이미 이번 달에 생성되어 있습니다.');
             } else {
@@ -1387,7 +1374,6 @@
                 await updateDoc(doc(db, `users/${currentUser.uid}/revenues`, revenueId), updatedRevenue);
                 editingRevenueId = null;
                 showSuccessMessage('매출이 수정되었습니다.');
-                console.log('매출 수정 완료:', revenueId);
             } catch (error) {
                 console.error('매출 수정 오류:', error);
                 alert('매출 수정 중 오류가 발생했습니다: ' + error.message);
@@ -1463,7 +1449,6 @@
                 await updateDoc(doc(db, `users/${currentUser.uid}/expenses`, expenseId), updatedExpense);
                 editingExpenseId = null;
                 showSuccessMessage('지출이 수정되었습니다.');
-                console.log('지출 수정 완료:', expenseId);
             } catch (error) {
                 console.error('지출 수정 오류:', error);
                 alert('지출 수정 중 오류가 발생했습니다: ' + error.message);
@@ -1534,7 +1519,6 @@
                 await updateDoc(doc(db, `users/${currentUser.uid}/fixedExpenses`, fixedId), updatedFixed);
                 editingFixedId = null;
                 showSuccessMessage('고정비가 수정되었습니다.');
-                console.log('고정비 수정 완료:', fixedId);
             } catch (error) {
                 console.error('고정비 수정 오류:', error);
                 alert('고정비 수정 중 오류가 발생했습니다: ' + error.message);
@@ -1575,7 +1559,7 @@
             });
         }
 
-        // 테이블 렌더링
+        // 지출 테이블 렌더링
         function renderExpenseTable() {
             const tbody = document.getElementById('expenseTableBody');
             
@@ -1604,6 +1588,7 @@
             });
         }
 
+        // 고정비 테이블 렌더링
         function renderFixedExpenseTable() {
             const tbody = document.getElementById('fixedExpenseTableBody');
             
@@ -1869,13 +1854,13 @@
             };
         }
 
-        // 파이 차트 그리기 (범례와 차트가 겹치지 않도록 개선)
+        // 파이 차트 그리기
         function drawPieChart(canvasId, data) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
-            const centerX = 200; // 차트 중심을 왼쪽으로 이동
+            const centerX = 200;
             const centerY = canvas.height / 2;
-            const radius = 140; // 적절한 크기
+            const radius = 140;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1924,13 +1909,13 @@
                 currentAngle += sliceAngle;
             });
 
-            // 범례 그리기 (오른쪽 공간에 배치)
+            // 범례 그리기
             drawLegend(ctx, canvas, categories, colors, data, total);
         }
 
-        // 범례 그리기 (개선된 버전 - 차트와 겹치지 않음)
+        // 범례 그리기
         function drawLegend(ctx, canvas, categories, colors, data, total) {
-            const legendStartX = 380; // 차트 오른쪽 충분한 여백
+            const legendStartX = 380;
             let legendY = 30;
             const legendItemHeight = 22;
             const maxVisibleItems = Math.floor((canvas.height - 80) / legendItemHeight);
@@ -1973,7 +1958,7 @@
                 // 금액과 퍼센트
                 const amount = data[category];
                 const percentage = ((amount / total) * 100).toFixed(1);
-                const amountText = `₩${amount.toLocaleString()}`; // 전체 원화 금액 표시
+                const amountText = `₩${amount.toLocaleString()}`;
                 
                 ctx.fillStyle = '#6c757d';
                 ctx.font = '10px Malgun Gothic';
@@ -2025,12 +2010,12 @@
                 const lastAmount = lastMonthData[category] || 0;
                 const thisAmount = thisMonthData[category] || 0;
 
-                // 지난 달 막대 (파스텔 핑크)
+                // 지난 달 막대
                 const lastBarHeight = (lastAmount / maxAmount) * chartHeight;
                 ctx.fillStyle = '#FFB3BA';
                 ctx.fillRect(x, chartTop + chartHeight - lastBarHeight, barWidth, lastBarHeight);
 
-                // 이번 달 막대 (파스텔 블루)
+                // 이번 달 막대
                 const thisBarHeight = (thisAmount / maxAmount) * chartHeight;
                 ctx.fillStyle = '#BFEFFF';
                 ctx.fillRect(x + barWidth + 8, chartTop + chartHeight - thisBarHeight, barWidth, thisBarHeight);
@@ -2042,7 +2027,7 @@
                 const categoryText = category.length > 8 ? category.substring(0, 8) + '...' : category;
                 ctx.fillText(categoryText, x + barWidth, canvas.height - 25);
                 
-                // 금액 라벨 (막대 위에)
+                // 금액 라벨
                 ctx.font = '9px Malgun Gothic';
                 ctx.fillStyle = '#666';
                 if (lastAmount > 0) {
@@ -2075,24 +2060,12 @@
             ctx.fillText('이번 달', legendX + 20, 50);
         }
 
-        // 파스텔톤 차트 색상 팔레트
+        // 차트 색상 팔레트
         function getChartColors() {
             return [
-                '#FFB3BA', // 파스텔 핑크
-                '#BFEFFF', // 파스텔 블루
-                '#FFFFBA', // 파스텔 옐로우
-                '#BAEFBA', // 파스텔 그린
-                '#E0BAFF', // 파스텔 퍼플
-                '#FFDFBA', // 파스텔 오렌지
-                '#BAF2FF', // 파스텔 사이안
-                '#F0BAFF', // 파스텔 매젠타
-                '#BAFFBA', // 파스텔 라임
-                '#FFE5BA', // 파스텔 피치
-                '#CABFFF', // 파스텔 라벤더
-                '#BAFFDF', // 파스텔 민트
-                '#FFBAD2', // 파스텔 로즈
-                '#D2BAFF', // 파스텔 바이올렛
-                '#BAFFE5'  // 파스텔 아쿠아
+                '#FFB3BA', '#BFEFFF', '#FFFFBA', '#BAEFBA', '#E0BAFF',
+                '#FFDFBA', '#BAF2FF', '#F0BAFF', '#BAFFBA', '#FFE5BA',
+                '#CABFFF', '#BAFFDF', '#FFBAD2', '#D2BAFF', '#BAFFE5'
             ];
         }
 
