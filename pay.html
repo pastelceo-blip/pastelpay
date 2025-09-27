@@ -533,6 +533,7 @@
                             <select id="revenueSource" name="revenueSource" required>
                                 <option value="">선택하세요</option>
                                 <option value="스마트스토어">스마트스토어</option>
+                                <option value="꽃비">꽃비</option>
                                 <option value="쿠팡">쿠팡</option>
                                 <option value="자사몰">자사몰</option>
                                 <option value="웨딩거래처">웨딩거래처</option>
@@ -1344,6 +1345,7 @@
             cells[1].innerHTML = `
                 <select class="edit-select" id="edit-revenue-source">
                     <option value="스마트스토어" ${revenue.source === '스마트스토어' ? 'selected' : ''}>스마트스토어</option>
+                                        <option value="꽃비" ${revenue.source === '꽃비' ? 'selected' : ''}>꽃비</option>
                     <option value="쿠팡" ${revenue.source === '쿠팡' ? 'selected' : ''}>쿠팡</option>
                     <option value="자사몰" ${revenue.source === '자사몰' ? 'selected' : ''}>자사몰</option>
                     <option value="웨딩거래처" ${revenue.source === '웨딩거래처' ? 'selected' : ''}>웨딩거래처</option>
@@ -2116,3 +2118,4 @@
     </script>
 </body>
 </html>
+
